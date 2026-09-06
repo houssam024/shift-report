@@ -1,0 +1,584 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>Daily Report & Handover</title>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{overscroll-behavior:none}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif;background:#eef0f6;padding:8px}
+body.noscroll{overflow:hidden;height:100%;position:fixed;width:100%}
+.container{max-width:680px;margin:0 auto;background:#fff;border-radius:14px;overflow:hidden;box-shadow:0 8px 30px rgba(0,0,0,.15)}
+.header{background:linear-gradient(135deg,#1f4e79,#2e7d8f);color:#fff;padding:16px}
+.header h1{font-size:18px}
+.header p{font-size:12px;opacity:.85;margin-top:3px}
+.bar{height:4px;background:rgba(255,255,255,.3);border-radius:2px;margin-top:12px;overflow:hidden}
+.fill{height:100%;background:#fff;width:20%;transition:.3s}
+.steps{font-size:11px;margin-top:6px;opacity:.9}
+.body{padding:18px 16px}
+.sec{display:none}.sec.on{display:block}
+h2{font-size:16px;color:#1f4e79;border-bottom:2px solid #1f4e79;padding-bottom:8px;margin-bottom:16px}
+h3{font-size:13px;color:#2e7d8f;margin:14px 0 8px}
+label{display:block;font-size:13px;font-weight:600;color:#333;margin-bottom:5px}
+input,select,textarea{width:100%;padding:11px;border:1.5px solid #d8dbe3;border-radius:7px;font-size:16px;font-family:inherit;background:#fff}
+input:focus,select:focus,textarea:focus{outline:none;border-color:#2e7d8f}
+textarea{min-height:80px;resize:vertical}
+.g{margin-bottom:14px}
+.r2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+button{padding:12px 16px;border:none;border-radius:7px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit}
+.b1{background:linear-gradient(135deg,#1f4e79,#2e7d8f);color:#fff}
+.b2{background:#e4e7ee;color:#333}
+.b3{background:#2e7d32;color:#fff}
+.b4{background:#c62828;color:#fff}
+.sm{padding:8px 11px;font-size:12px}
+.nav{display:flex;gap:8px;margin-top:22px;padding-top:16px;border-top:1px solid #e4e7ee}
+.nav button{flex:1}
+.card{background:#f7f8fb;border-left:4px solid #2e7d8f;border-radius:6px;padding:11px;margin-bottom:9px;display:flex;justify-content:space-between;align-items:center;gap:8px}
+.card.stop{border-left-color:#e65100}.card.np{border-left-color:#f9a825}.card.nd{border-left-color:#6a1b9a}
+.card b{font-size:13px;display:block}.card span{font-size:11px;color:#666}
+.box{background:#f7f8fb;border-radius:8px;padding:14px;margin-bottom:14px;border:1.5px solid #d8dbe3}
+.note{background:#e8f4fd;border-left:3px solid #2196f3;padding:10px;border-radius:5px;font-size:12px;color:#0d47a1;margin-bottom:14px}
+.warn{background:#fff4e5;border-left:3px solid #ef6c00;padding:10px;border-radius:5px;font-size:12px;color:#e65100;margin-bottom:14px}
+.empty{text-align:center;color:#999;font-size:12px;padding:16px}
+.sum{background:#f7f8fb;border-radius:8px;padding:14px;font-size:13px}
+.sum div{display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #e4e7ee}
+.sum div:last-child{border:none}.sum b{color:#555;font-weight:600}
+.dl{display:flex;flex-direction:column;gap:9px;margin:14px 0}.dl button{width:100%}
+.tabs{display:flex;gap:6px;margin-bottom:14px}
+.tabs button{flex:1;font-size:11px;padding:9px 4px}
+.tabs button.act{background:linear-gradient(135deg,#1f4e79,#2e7d8f);color:#fff}
+.tabs button:not(.act){background:#e4e7ee;color:#555}
+
+/* --- bloc signature (aperçu) --- */
+.sigslot{background:#f7f8fb;border:1.5px solid #2e7d8f;border-radius:8px;padding:14px;margin-bottom:14px}
+.sigprev{border:1.5px dashed #b0b6c3;border-radius:6px;background:#fff;min-height:90px;display:flex;align-items:center;justify-content:center;margin:10px 0;overflow:hidden}
+.sigprev img{max-width:100%;max-height:120px;display:block}
+.sigprev .ph{color:#9aa2b1;font-size:12px;padding:26px 10px;text-align:center}
+.sigok{color:#2e7d32;font-size:12px;font-weight:600}
+
+/* --- overlay plein écran --- */
+#padOverlay{position:fixed;inset:0;background:#0e1b2a;z-index:9999;display:none;flex-direction:column;touch-action:none}
+#padOverlay.on{display:flex}
+.padTop{color:#fff;padding:12px 14px;display:flex;justify-content:space-between;align-items:center;flex:0 0 auto}
+.padTop b{font-size:14px}
+.padTop small{display:block;font-size:11px;opacity:.7;margin-top:2px}
+.padStage{flex:1 1 auto;padding:0 10px;display:flex}
+.padCanvasWrap{flex:1;background:#fff;border-radius:10px;position:relative;overflow:hidden}
+#padCanvas{display:block;width:100%;height:100%;touch-action:none;background:#fff}
+.padGuide{position:absolute;left:8%;right:8%;bottom:22%;border-bottom:2px solid #e3e7ee;pointer-events:none}
+.padGuide::after{content:'✕';position:absolute;left:-4px;bottom:2px;color:#c9ced8;font-size:14px}
+.padBottom{flex:0 0 auto;padding:12px 10px calc(12px + env(safe-area-inset-bottom));display:flex;gap:8px}
+.padBottom button{flex:1;padding:15px 10px;font-size:15px}
+.rotate{color:#ffd54f;font-size:11px;text-align:center;padding:4px 0}
+@media(max-width:480px){.r2{grid-template-columns:1fr}.nav{flex-direction:column}}
+</style>
+</head>
+<body>
+
+<!-- ============ SORTANT ============ -->
+<div class="container" id="appSortant">
+<div class="header">
+  <h1>📋 Daily Report & Handover</h1>
+  <p>Superviseur sortant — remplissage</p>
+  <div class="bar"><div class="fill" id="fill"></div></div>
+  <div class="steps"><span id="stepNum">1</span> / 5 — <span id="stepName">Informations</span></div>
+</div>
+<div class="body">
+
+<!-- 1 INFOS -->
+<div class="sec on" data-name="Informations">
+  <h2>📅 Informations générales</h2>
+  <div class="r2">
+    <div class="g"><label>Date</label><input type="date" id="i_date"></div>
+    <div class="g"><label>Shift</label><select id="i_shift">
+      <option value="">—</option><option>1er (06h-14h)</option><option>2ème (14h-22h)</option><option>3ème (22h-06h)</option>
+    </select></div>
+  </div>
+  <div class="r2">
+    <div class="g"><label>Unité / Zone</label><input type="text" id="i_unit" placeholder="Convoyeurs, H3, Port…"></div>
+    <div class="g"><label>Équipe (A/B/C/D)</label><input type="text" id="i_team" placeholder="A"></div>
+  </div>
+  <div class="r2">
+    <div class="g"><label>Superviseur sortant</label><input type="text" id="i_out" placeholder="Nom complet"></div>
+    <div class="g"><label>Fonction</label><input type="text" id="i_outfn" placeholder="E/I Supervisor"></div>
+  </div>
+  <div class="r2">
+    <div class="g"><label>Superviseur entrant</label><input type="text" id="i_in" placeholder="Nom complet"></div>
+    <div class="g"><label>Email superviseur entrant</label><input type="email" id="i_inmail" placeholder="nom@ocpgroup.ma"></div>
+  </div>
+  <div class="r2">
+    <div class="g"><label>Effectif (nombre)</label><input type="number" id="i_wf" min="0" placeholder="0"></div>
+    <div class="g"><label>Heures de travail</label><input type="number" id="i_hrs" min="0" step="0.5" placeholder="8"></div>
+  </div>
+</div>
+
+<!-- 2 ARRETS -->
+<div class="sec" data-name="Arrêts">
+  <h2>⚠️ Déclaration des arrêts</h2>
+  <div class="note">Ces arrêts partent dans le fichier Excel central des arrêts (SharePoint), séparément du Daily Report.</div>
+  <div id="stopList"></div>
+  <button class="b1 sm" onclick="openStop()">➕ Ajouter un arrêt</button>
+  <div id="stopForm" style="display:none;margin-top:14px"><div class="box">
+    <div class="g"><label>Type d'arrêt</label><select id="st_type">
+      <option value="">—</option><option>RAS</option><option>Subit</option><option>RAS H3</option><option>Planifié</option><option>Opportunité</option>
+    </select></div>
+    <div class="g"><label>Machine / Équipement</label><select id="st_eq">
+      <option value="">—</option>
+      <option>Gratteur GR2H1</option><option>Gratteur GR2H2</option>
+      <option>Convoyeur D31</option><option>Convoyeur D32</option><option>Convoyeur D33</option>
+      <option>Convoyeur D4</option><option>Convoyeur D5 H3</option><option>Convoyeur D6 H3</option>
+      <option>Convoyeur SA3 H3</option><option>Convoyeur RA</option><option>Convoyeur RB</option>
+      <option>Convoyeur RC</option><option>Convoyeur RD</option><option>Convoyeur RH</option>
+      <option>Convoyeur S01</option><option>Convoyeur SA</option><option>Convoyeur SB</option>
+      <option>Chariot CV1</option><option>Chariot CV2</option><option>Chariot CV3</option><option>Chariot CV4 H3</option>
+      <option>STACKER</option><option>U162</option><option>PE 162</option>
+      <option>Volet D3Bis</option><option>Volet D3Fut</option><option>Autre</option>
+    </select></div>
+    <div class="r2">
+      <div class="g"><label>Date début</label><input type="date" id="st_d1"></div>
+      <div class="g"><label>Heure début</label><input type="time" id="st_h1"></div>
+    </div>
+    <div class="r2">
+      <div class="g"><label>Date fin</label><input type="date" id="st_d2"></div>
+      <div class="g"><label>Heure fin</label><input type="time" id="st_h2"></div>
+    </div>
+    <div class="g"><label>Cause</label><textarea id="st_cause"></textarea></div>
+    <div class="g"><label>Actions réalisées</label><textarea id="st_act"></textarea></div>
+    <div class="g"><label>Efficacité de la solution</label><select id="st_eff">
+      <option value="">—</option><option>Solution provisoire</option><option>Solution à long terme</option>
+    </select></div>
+    <div style="display:flex;gap:8px">
+      <button class="b2 sm" onclick="closeStop()">Annuler</button>
+      <button class="b1 sm" onclick="saveStop()">✅ Enregistrer l'arrêt</button>
+    </div>
+  </div></div>
+</div>
+
+<!-- 3 TRAVAUX -->
+<div class="sec" data-name="Travaux">
+  <h2>🔧 Travaux</h2>
+  <div class="tabs">
+    <button id="tb_p" class="act" onclick="openWork('p')">Planifiés<br>(N° WO)</button>
+    <button id="tb_u" onclick="openWork('u')">Non planifiés<br>(N° DI)</button>
+    <button id="tb_n" onclick="openWork('n')">Lendemain<br>(N° I/OT)</button>
+  </div>
+  <div id="workList"></div>
+  <div id="workForm" style="display:none"><div class="box">
+    <h3 id="wfTitle"></h3>
+    <div class="r2">
+      <div class="g"><label id="wfNumLbl">N° WO</label><input type="text" id="w_num"></div>
+      <div class="g"><label>Type</label><input type="text" id="w_type" placeholder="MEC / ELEC / …"></div>
+    </div>
+    <div class="g"><label>TAG Equipment</label><input type="text" id="w_tag"></div>
+    <div class="g"><label id="wfDescLbl">Description</label><textarea id="w_desc"></textarea></div>
+    <div id="fld_p" style="display:none">
+      <div class="g"><label>Executed (Yes/No) ?</label><select id="w_exec"><option value="">—</option><option>Yes</option><option>No</option></select></div>
+      <div class="g"><label>Causes of non-execution</label><textarea id="w_cause"></textarea></div>
+    </div>
+    <div id="fld_u" style="display:none">
+      <div class="g"><label>Emergency (Y/N) ?</label><select id="w_emg"><option value="">—</option><option>Yes</option><option>No</option></select></div>
+      <div class="g"><label>Comments</label><textarea id="w_com"></textarea></div>
+    </div>
+    <div id="fld_n" style="display:none">
+      <div class="g"><label>Planned (Yes/No) ?</label><select id="w_plan"><option value="">—</option><option>Yes</option><option>No</option></select></div>
+    </div>
+    <h3>👷 Resource allocation</h3>
+    <div class="r2"><div class="g"><label>Mechanic — nombre</label><input type="number" id="w_mec_n" min="0"></div>
+      <div class="g"><label>Mechanic — temps réel (h)</label><input type="number" id="w_mec_t" min="0" step="0.5" oninput="calcReal()"></div></div>
+    <div class="r2"><div class="g"><label>Boilermaker — nombre</label><input type="number" id="w_boi_n" min="0"></div>
+      <div class="g"><label>Boilermaker — temps réel (h)</label><input type="number" id="w_boi_t" min="0" step="0.5" oninput="calcReal()"></div></div>
+    <div class="r2"><div class="g"><label>Welder — nombre</label><input type="number" id="w_wel_n" min="0"></div>
+      <div class="g"><label>Welder — temps réel (h)</label><input type="number" id="w_wel_t" min="0" step="0.5" oninput="calcReal()"></div></div>
+    <div class="r2"><div class="g"><label>Electrician — nombre</label><input type="number" id="w_ele_n" min="0"></div>
+      <div class="g"><label>Electrician — temps réel (h)</label><input type="number" id="w_ele_t" min="0" step="0.5" oninput="calcReal()"></div></div>
+    <div class="r2"><div class="g"><label>Instrumentalist — nombre</label><input type="number" id="w_ins_n" min="0"></div>
+      <div class="g"><label>Instrumentalist — temps réel (h)</label><input type="number" id="w_ins_t" min="0" step="0.5" oninput="calcReal()"></div></div>
+    <div class="r2"><div class="g"><label>Other — nombre</label><input type="number" id="w_oth_n" min="0"></div>
+      <div class="g"><label>Other — temps réel (h)</label><input type="number" id="w_oth_t" min="0" step="0.5" oninput="calcReal()"></div></div>
+    <h3>⏱️ Intervention time</h3>
+    <div class="r2">
+      <div class="g"><label>Estimated total (h)</label><input type="number" id="w_est" min="0" step="0.5"></div>
+      <div class="g"><label>Real total (h) — auto</label><input type="number" id="w_real" readonly style="background:#eceff4"></div>
+    </div>
+    <div style="display:flex;gap:8px;margin-top:10px">
+      <button class="b2 sm" onclick="closeWork()">Annuler</button>
+      <button class="b1 sm" onclick="saveWork()">✅ Enregistrer</button>
+    </div>
+  </div></div>
+</div>
+
+<!-- 4 HANDOVER -->
+<div class="sec" data-name="Handover">
+  <h2>✋ Handover</h2>
+  <div class="note">Date, shift, équipe et superviseurs sont repris automatiquement de l'étape 1.</div>
+  <div class="g"><label>Completed Actions</label><textarea id="h_done" placeholder="Une action par ligne"></textarea></div>
+  <div class="g"><label>Actions to Complete</label><textarea id="h_todo" placeholder="Une action par ligne"></textarea></div>
+
+  <div class="sigslot">
+    <label>✍️ Signature — Superviseur SORTANT</label>
+    <div class="sigprev" id="prev_out"><div class="ph">Aucune signature</div></div>
+    <button class="b1" style="width:100%" onclick="openPad('out')">✍️ Signer en plein écran</button>
+  </div>
+  <div class="warn">Le superviseur entrant signera de son côté via le lien généré à l'étape suivante.</div>
+</div>
+
+<!-- 5 EXPORT -->
+<div class="sec" data-name="Export">
+  <h2>📤 Téléchargements & envoi</h2>
+  <div class="sum" id="sum"></div>
+  <h3>Fichiers du superviseur sortant</h3>
+  <div class="dl">
+    <button class="b3" onclick="dlDaily()">📊 Daily Report (.xlsx)</button>
+    <button class="b3" onclick="dlHandover()">📋 Handover (.doc signé)</button>
+  </div>
+  <h3>Registre des arrêts (SharePoint)</h3>
+  <div class="dl"><button class="b1" onclick="dlStops()">⚠️ Exporter les arrêts (.xlsx)</button></div>
+  <h3>Superviseur entrant</h3>
+  <div class="dl"><button class="b1" onclick="genLink()">🔗 Générer le lien de signature</button></div>
+  <div id="linkOut"></div>
+</div>
+
+<div class="nav">
+  <button class="b2" id="prev" onclick="go(-1)" disabled>← Précédent</button>
+  <button class="b1" id="next" onclick="go(1)">Suivant →</button>
+</div>
+</div></div>
+
+<!-- ============ ENTRANT ============ -->
+<div class="container" id="appEntrant" style="display:none">
+<div class="header"><h1>✋ Handover — Signature</h1><p>Superviseur entrant</p></div>
+<div class="body">
+  <div class="sum" id="e_info"></div>
+  <h3>✅ Completed Actions</h3><div class="box" id="e_done"></div>
+  <h3>📌 Actions to Complete</h3><div class="box" id="e_todo"></div>
+  <h3>Signature du superviseur sortant</h3>
+  <div class="sigprev"><img id="e_sigout"></div>
+  <div class="sigslot" style="margin-top:16px">
+    <label>✍️ Votre signature — Superviseur ENTRANT</label>
+    <div class="sigprev" id="prev_in"><div class="ph">Aucune signature</div></div>
+    <button class="b1" style="width:100%" onclick="openPad('in')">✍️ Signer en plein écran</button>
+  </div>
+  <button class="b3" style="width:100%" onclick="dlHandoverFinal()">📋 Valider et télécharger le Handover signé</button>
+</div></div>
+
+<!-- ============ OVERLAY SIGNATURE ============ -->
+<div id="padOverlay">
+  <div class="padTop">
+    <div><b id="padWho">Signature</b><small>Signez avec le doigt — la page ne bouge pas</small></div>
+    <button class="b2 sm" onclick="closePad()">✕</button>
+  </div>
+  <div class="rotate">💡 Tournez le téléphone à l'horizontale pour plus de place</div>
+  <div class="padStage">
+    <div class="padCanvasWrap">
+      <canvas id="padCanvas"></canvas>
+      <div class="padGuide"></div>
+    </div>
+  </div>
+  <div class="padBottom">
+    <button class="b2" onclick="padClear()">🗑️ Effacer</button>
+    <button class="b3" onclick="padValidate()">✅ Valider</button>
+  </div>
+</div>
+
+<script>
+let step=1, stops=[], works={p:[],u:[],n:[]}, curW='p';
+const SIG={out:'',in:''};
+const $=id=>document.getElementById(id);
+const v=id=>($(id)?$(id).value:'')||'';
+
+/* ================= PAD PLEIN ECRAN ================= */
+let padTarget=null, padCtx=null, padHasInk=false, padScrollY=0;
+
+function openPad(which){
+  padTarget=which;
+  $('padWho').textContent = which==='out' ? 'Signature — superviseur sortant' : 'Signature — superviseur entrant';
+  padScrollY=window.scrollY;
+  document.body.classList.add('noscroll');
+  document.body.style.top=(-padScrollY)+'px';
+  $('padOverlay').classList.add('on');
+  setTimeout(padSetup,60);
+}
+function closePad(){
+  $('padOverlay').classList.remove('on');
+  document.body.classList.remove('noscroll');
+  document.body.style.top='';
+  window.scrollTo(0,padScrollY);
+}
+function padSetup(){
+  const c=$('padCanvas');
+  const r=c.getBoundingClientRect();
+  const dpr=window.devicePixelRatio||1;
+  c.width=Math.round(r.width*dpr); c.height=Math.round(r.height*dpr);
+  padCtx=c.getContext('2d');
+  padCtx.setTransform(dpr,0,0,dpr,0,0);
+  padCtx.lineWidth=3; padCtx.lineCap='round'; padCtx.lineJoin='round'; padCtx.strokeStyle='#12233a';
+  padHasInk=false;
+  // restaurer une signature déjà faite
+  const prev=SIG[padTarget];
+  if(prev){const img=new Image();img.onload=()=>{padCtx.drawImage(img,0,0,r.width,r.height);padHasInk=true};img.src=prev}
+  if(c.dataset.bound) return; c.dataset.bound='1';
+
+  let drawing=false, pts=[];
+  const pos=e=>{const b=c.getBoundingClientRect();return{x:e.clientX-b.left,y:e.clientY-b.top}};
+
+  c.addEventListener('pointerdown',e=>{
+    e.preventDefault(); c.setPointerCapture(e.pointerId);
+    drawing=true; padHasInk=true; const p=pos(e); pts=[p];
+    padCtx.beginPath(); padCtx.moveTo(p.x,p.y); padCtx.lineTo(p.x+0.01,p.y+0.01); padCtx.stroke();
+  },{passive:false});
+
+  c.addEventListener('pointermove',e=>{
+    if(!drawing) return; e.preventDefault();
+    const evs=e.getCoalescedEvents?e.getCoalescedEvents():[e];
+    for(const ev of evs){
+      pts.push(pos(ev));
+      const n=pts.length; if(n<3) continue;
+      const a=pts[n-3],b=pts[n-2],d=pts[n-1];
+      padCtx.beginPath();
+      padCtx.moveTo((a.x+b.x)/2,(a.y+b.y)/2);
+      padCtx.quadraticCurveTo(b.x,b.y,(b.x+d.x)/2,(b.y+d.y)/2);
+      padCtx.stroke();
+    }
+  },{passive:false});
+
+  const end=e=>{
+    if(!drawing) return; drawing=false;
+    try{c.releasePointerCapture(e.pointerId)}catch(_){}
+    if(pts.length>=2){const a=pts[pts.length-2],b=pts[pts.length-1];
+      padCtx.beginPath();padCtx.moveTo((a.x+b.x)/2,(a.y+b.y)/2);padCtx.lineTo(b.x,b.y);padCtx.stroke()}
+    pts=[];
+  };
+  c.addEventListener('pointerup',end); c.addEventListener('pointercancel',end);
+  c.addEventListener('pointerleave',e=>{if(drawing)end(e)});
+}
+window.addEventListener('orientationchange',()=>{if($('padOverlay').classList.contains('on'))setTimeout(padSetup,300)});
+function padClear(){const c=$('padCanvas');padCtx.save();padCtx.setTransform(1,0,0,1,0,0);padCtx.clearRect(0,0,c.width,c.height);padCtx.restore();padHasInk=false}
+function padValidate(){
+  if(!padHasInk){alert('Aucune signature tracée.');return}
+  SIG[padTarget]=trimSig($('padCanvas'));
+  const slot=$(padTarget==='out'?'prev_out':'prev_in');
+  slot.innerHTML=`<img src="${SIG[padTarget]}">`;
+  closePad();
+}
+/* recadre la signature sur son encre */
+function trimSig(c){
+  const x=c.getContext('2d'), w=c.width, h=c.height;
+  const d=x.getImageData(0,0,w,h).data;
+  let x0=w,y0=h,x1=0,y1=0,found=false;
+  for(let y=0;y<h;y++)for(let px=0;px<w;px++){
+    if(d[(y*w+px)*4+3]>10){found=true;if(px<x0)x0=px;if(px>x1)x1=px;if(y<y0)y0=y;if(y>y1)y1=y}
+  }
+  if(!found) return c.toDataURL('image/png');
+  const pad=12;
+  x0=Math.max(0,x0-pad);y0=Math.max(0,y0-pad);x1=Math.min(w,x1+pad);y1=Math.min(h,y1+pad);
+  const o=document.createElement('canvas'); o.width=x1-x0; o.height=y1-y0;
+  o.getContext('2d').drawImage(c,x0,y0,o.width,o.height,0,0,o.width,o.height);
+  return o.toDataURL('image/png');
+}
+
+/* ================= NAVIGATION ================= */
+function show(n){
+  const secs=document.querySelectorAll('#appSortant .sec');
+  n=Math.max(1,Math.min(secs.length,n)); step=n;
+  secs.forEach((s,i)=>s.classList.toggle('on',i===n-1));
+  $('stepNum').textContent=n; $('stepName').textContent=secs[n-1].dataset.name;
+  $('fill').style.width=(n/secs.length*100)+'%';
+  $('prev').disabled=n===1;
+  $('next').style.display=n===secs.length?'none':'block';
+  if(n===5) sum();
+  window.scrollTo(0,0);
+}
+function go(d){show(step+d)}
+
+/* ================= ARRETS ================= */
+function openStop(){$('stopForm').style.display='block'}
+function closeStop(){$('stopForm').style.display='none';['st_type','st_eq','st_d1','st_h1','st_d2','st_h2','st_cause','st_act','st_eff'].forEach(i=>$(i).value='')}
+function dur(d1,h1,d2,h2){if(!d1||!h1||!d2||!h2)return'';const a=new Date(d1+'T'+h1),b=new Date(d2+'T'+h2);
+  const m=(b-a)/60000;return(isNaN(m)||m<0)?'':(m/60).toFixed(2)}
+function saveStop(){
+  const s={type:v('st_type'),eq:v('st_eq'),d1:v('st_d1'),h1:v('st_h1'),d2:v('st_d2'),h2:v('st_h2'),
+    cause:v('st_cause'),act:v('st_act'),eff:v('st_eff')};
+  s.dur=dur(s.d1,s.h1,s.d2,s.h2); stops.push(s); renderStops(); closeStop();
+}
+function renderStops(){
+  $('stopList').innerHTML=stops.length?stops.map((s,i)=>
+    `<div class="card stop"><div><b>${s.eq||'—'} — ${s.type||'—'}</b>
+     <span>${s.h1||'?'} → ${s.h2||'?'} · ${s.dur?s.dur+' h':'durée ?'}</span></div>
+     <button class="b4 sm" onclick="delStop(${i})">🗑️</button></div>`).join('')
+    :'<div class="empty">Aucun arrêt déclaré</div>';
+}
+function delStop(i){stops.splice(i,1);renderStops()}
+
+/* ================= TRAVAUX ================= */
+const WT={p:{t:'📋 Travail planifié',num:'N° WO',desc:'Description'},
+          u:{t:'📋 Travail non planifié',num:'N° DI',desc:'Description & TAG'},
+          n:{t:'📋 Travail planifié lendemain',num:'N° I/OT',desc:'Description & TAG'}};
+function openWork(k){
+  curW=k; ['p','u','n'].forEach(x=>$('tb_'+x).classList.toggle('act',x===k));
+  $('wfTitle').textContent=WT[k].t; $('wfNumLbl').textContent=WT[k].num; $('wfDescLbl').textContent=WT[k].desc;
+  ['p','u','n'].forEach(x=>$('fld_'+x).style.display=(x===k?'block':'none'));
+  $('workForm').style.display='block'; renderWorks();
+}
+function closeWork(){$('workForm').style.display='none'}
+function calcReal(){const t=['mec','boi','wel','ele','ins','oth'].reduce((s,k)=>s+(parseFloat(v('w_'+k+'_t'))||0),0);$('w_real').value=t.toFixed(1)}
+function saveWork(){
+  const w={num:v('w_num'),type:v('w_type'),tag:v('w_tag'),desc:v('w_desc'),
+    mec_n:v('w_mec_n'),mec_t:v('w_mec_t'),boi_n:v('w_boi_n'),boi_t:v('w_boi_t'),
+    wel_n:v('w_wel_n'),wel_t:v('w_wel_t'),ele_n:v('w_ele_n'),ele_t:v('w_ele_t'),
+    ins_n:v('w_ins_n'),ins_t:v('w_ins_t'),oth_n:v('w_oth_n'),oth_t:v('w_oth_t'),
+    est:v('w_est'),real:v('w_real')};
+  if(curW==='p'){w.exec=v('w_exec');w.cause=v('w_cause')}
+  if(curW==='u'){w.emg=v('w_emg');w.com=v('w_com')}
+  if(curW==='n'){w.plan=v('w_plan')}
+  works[curW].push(w);
+  ['w_num','w_type','w_tag','w_desc','w_exec','w_cause','w_emg','w_com','w_plan','w_est','w_real',
+   'w_mec_n','w_mec_t','w_boi_n','w_boi_t','w_wel_n','w_wel_t','w_ele_n','w_ele_t','w_ins_n','w_ins_t','w_oth_n','w_oth_t']
+   .forEach(i=>{if($(i))$(i).value=''});
+  renderWorks();
+}
+function renderWorks(){
+  const cls={p:'',u:'np',n:'nd'}; let h='';
+  ['p','u','n'].forEach(k=>{
+    if(!works[k].length)return;
+    h+=`<h3>${WT[k].t} (${works[k].length})</h3>`+works[k].map((w,i)=>
+      `<div class="card ${cls[k]}"><div><b>${w.num||'—'} · ${w.tag||'—'}</b>
+       <span>${(w.desc||'').slice(0,48)} · réel ${w.real||0} h</span></div>
+       <button class="b4 sm" onclick="delWork('${k}',${i})">🗑️</button></div>`).join('');
+  });
+  $('workList').innerHTML=h||'<div class="empty">Aucun travail saisi</div>';
+}
+function delWork(k,i){works[k].splice(i,1);renderWorks()}
+
+/* ================= RESUME ================= */
+function sum(){
+  const nb=works.p.length+works.u.length+works.n.length;
+  const th=[...works.p,...works.u,...works.n].reduce((s,w)=>s+(parseFloat(w.real)||0),0);
+  const wf=parseFloat(v('i_wf'))||0,hr=parseFloat(v('i_hrs'))||0;
+  const taux=(wf*hr)?((th/(wf*hr))*100).toFixed(1)+' %':'—';
+  $('sum').innerHTML=`
+   <div><b>Date</b><span>${v('i_date')||'—'}</span></div>
+   <div><b>Shift</b><span>${v('i_shift')||'—'}</span></div>
+   <div><b>Sortant</b><span>${v('i_out')||'—'}</span></div>
+   <div><b>Entrant</b><span>${v('i_in')||'—'}</span></div>
+   <div><b>Effectif × heures</b><span>${wf} × ${hr} h</span></div>
+   <div><b>Arrêts déclarés</b><span>${stops.length}</span></div>
+   <div><b>Travaux</b><span>${nb} (P:${works.p.length} / NP:${works.u.length} / J+1:${works.n.length})</span></div>
+   <div><b>Temps réel total</b><span>${th.toFixed(1)} h</span></div>
+   <div><b>Taux d'occupation</b><span>${taux}</span></div>
+   <div><b>Signature sortant</b><span>${SIG.out?'<span class="sigok">✅ signée</span>':'—'}</span></div>`;
+}
+
+/* ================= EXPORTS ================= */
+const RES=['Mechanic','Real occ. time','Boilermaker','Real occ. time','Welder','Real occ. time',
+           'Electrician','Real occ. time','Instrumentalist','Real occ. time','Other','Real occ. time'];
+function resRow(w){return[w.mec_n,w.mec_t,w.boi_n,w.boi_t,w.wel_n,w.wel_t,w.ele_n,w.ele_t,w.ins_n,w.ins_t,w.oth_n,w.oth_t]}
+function dlDaily(){
+  const wf=parseFloat(v('i_wf'))||0,hr=parseFloat(v('i_hrs'))||0,cap=wf*hr;
+  const occ=l=>l.reduce((s,w)=>s+['mec','boi','wel','ele','ins','oth']
+    .reduce((a,k)=>a+((parseFloat(w[k+'_n'])||0)*(parseFloat(w[k+'_t'])||0)),0),0);
+  const oP=occ(works.p),oU=occ(works.u);
+  const A=[];
+  A.push(['Daily Activity Report and Forecast']);A.push([]);
+  A.push(['Project Title','Solid Sulfur Port Superstructure','','Customer','OCP']);
+  A.push(['Date',v('i_date'),'','Unit',v('i_unit')]);
+  A.push(['Shift',v('i_shift'),'','Équipe',v('i_team')]);
+  A.push(['Superviseur sortant',v('i_out'),'','Superviseur entrant',v('i_in')]);
+  A.push(['Nombre of workforce',wf,'',"Nombre d'heures de travail",hr]);
+  A.push(["Taux d'occupation Planned",cap?oP/cap:0,'',"Taux d'occupation Non Planned",cap?oU/cap:0]);
+  A.push(["Taux d'occupation total",cap?(oP+oU)/cap:0]);A.push([]);
+  const hdr=(n,d,c5,c6)=>['N° '+n,'Type','TAG Equipment',d,c5,c6,...RES,'Estimated total','Real total'];
+  A.push(['PLANNED WORK ORDERS']);
+  A.push(hdr('WO','Description','Executed (Yes/No) ?','Causes of non-execution'));
+  works.p.forEach(w=>A.push([w.num,w.type,w.tag,w.desc,w.exec,w.cause,...resRow(w),w.est,w.real]));
+  A.push([]);A.push(['NON PLANNED WORKS']);
+  A.push(hdr('DI','Description & TAG','Emergency (Y/N) ?','Comments'));
+  works.u.forEach(w=>A.push([w.num,w.type,w.tag,w.desc,w.emg,w.com,...resRow(w),w.est,w.real]));
+  A.push([]);A.push(['WORK PLANNED FOR NEXT DAY AND FORECAST']);
+  A.push(hdr('I/OT','Description & TAG','Planned (Yes/No) ?',''));
+  works.n.forEach(w=>A.push([w.num,w.type,w.tag,w.desc,w.plan,'',...resRow(w),w.est,w.real]));
+  const ws=XLSX.utils.aoa_to_sheet(A);
+  ws['!cols']=[{wch:12},{wch:10},{wch:16},{wch:42},{wch:20},{wch:24}].concat(Array(12).fill({wch:11}),[{wch:14},{wch:12}]);
+  const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,'Daily report');
+  XLSX.writeFile(wb,`DR_${(v('i_date')||'sansdate').replace(/-/g,'_')}_${(v('i_shift')||'').slice(0,4)}.xlsx`);
+}
+function dlStops(){
+  if(!stops.length){alert('Aucun arrêt à exporter.');return}
+  const A=[['Date saisie','Date shift','Shift','Unité','Superviseur','Type arrêt','Machine',
+            'Date début','Heure début','Date fin','Heure fin','Durée (h)','Cause','Actions réalisées','Efficacité solution']];
+  const now=new Date().toISOString().slice(0,16).replace('T',' ');
+  stops.forEach(s=>A.push([now,v('i_date'),v('i_shift'),v('i_unit'),v('i_out'),s.type,s.eq,
+    s.d1,s.h1,s.d2,s.h2,s.dur?parseFloat(s.dur):'',s.cause,s.act,s.eff]));
+  const ws=XLSX.utils.aoa_to_sheet(A);
+  ws['!cols']=[{wch:16},{wch:12},{wch:14},{wch:14},{wch:20},{wch:13},{wch:20},{wch:12},{wch:10},{wch:12},{wch:10},{wch:10},{wch:38},{wch:38},{wch:20}];
+  const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,'Arrets');
+  XLSX.writeFile(wb,`ARRETS_${(v('i_date')||'sansdate').replace(/-/g,'_')}.xlsx`);
+}
+function hoHTML(so,si){
+  const li=t=>(t||'').split('\n').filter(x=>x.trim()).map((x,i)=>`<tr><td width="30">${i+1}</td><td>${x}</td></tr>`).join('')||'<tr><td></td><td>—</td></tr>';
+  return `<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word"><head><meta charset="utf-8">
+  <style>body{font-family:Calibri,Arial;font-size:11pt}table{border-collapse:collapse;width:100%;margin-bottom:12px}
+  td,th{border:1px solid #666;padding:5px;font-size:10pt}th{background:#1f4e79;color:#fff}
+  h2{font-size:13pt;color:#1f4e79;margin:14px 0 6px}</style></head><body>
+  <p><b>Function: JESA Asset Management</b><br>Shift Handover Sheet</p>
+  <table><tr><th colspan="4">Project Details</th></tr>
+  <tr><td><b>Project Title</b></td><td>Solid Sulfur Port Superstructure</td><td><b>Customer</b></td><td>OCP-B10</td></tr>
+  <tr><td><b>Unit</b></td><td>${v('i_unit')||'—'}</td><td><b>Date</b></td><td>${v('i_date')||'—'}</td></tr>
+  <tr><td><b>Shift</b></td><td>${v('i_shift')||'—'}</td><td><b>Équipe</b></td><td>${v('i_team')||'—'}</td></tr></table>
+  <table>
+  <tr><td><b>Shift* Supervisor (sortant)</b></td><td>${v('i_out')||'—'}</td><td><b>Function</b></td><td>${v('i_outfn')||'—'}</td></tr>
+  <tr><td><b>Shift** Supervisor (entrant)</b></td><td colspan="3">${v('i_in')||'—'}</td></tr></table>
+  <h2>Completed Actions</h2><table>${li(v('h_done'))}</table>
+  <h2>Actions to Complete</h2><table>${li(v('h_todo'))}</table>
+  <table><tr><th width="50%">Closing Shift Signature</th><th>Starting Shift Signature</th></tr>
+  <tr><td align="center" height="90">${so?`<img src="${so}" width="230">`:'&nbsp;'}<br>${v('i_out')||''}</td>
+      <td align="center" height="90">${si?`<img src="${si}" width="230">`:'&nbsp;'}<br>${v('i_in')||''}</td></tr></table>
+  </body></html>`;
+}
+function saveDoc(html,name){const b=new Blob(['\ufeff'+html],{type:'application/msword'});
+  const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download=name;a.click()}
+function dlHandover(){saveDoc(hoHTML(SIG.out,''),`HANDOVER_${(v('i_date')||'sansdate').replace(/-/g,'_')}.doc`)}
+function dlHandoverFinal(){saveDoc(hoHTML(window.__sigOut||'',SIG.in),`HANDOVER_SIGNE_${(v('i_date')||'doc').replace(/-/g,'_')}.doc`)}
+
+/* ================= LIEN ENTRANT ================= */
+function genLink(){
+  const p={d:v('i_date'),s:v('i_shift'),u:v('i_unit'),tm:v('i_team'),o:v('i_out'),i:v('i_in'),f:v('i_outfn'),
+    todo:v('h_todo'),done:v('h_done'),sig:SIG.out};
+  const url=location.origin+location.pathname+'#e='+encodeURIComponent(btoa(unescape(encodeURIComponent(JSON.stringify(p)))));
+  $('linkOut').innerHTML=`<div class="box"><label>Lien à envoyer à ${v('i_in')||"l'entrant"} :</label>
+    <textarea readonly style="font-size:11px;min-height:70px">${url}</textarea>
+    <div style="display:flex;gap:8px;margin-top:8px">
+    <button class="b1 sm" onclick="navigator.clipboard.writeText(document.querySelector('#linkOut textarea').value);this.textContent='✅ Copié'">📋 Copier</button>
+    <button class="b1 sm" onclick="mailLink()">✉️ Email</button></div></div>`;
+}
+function mailLink(){
+  const url=document.querySelector('#linkOut textarea').value;
+  location.href=`mailto:${v('i_inmail')}?subject=${encodeURIComponent('Handover à signer — '+v('i_date')+' '+v('i_shift'))}`
+    +`&body=${encodeURIComponent('Bonjour '+v('i_in')+',\n\nMerci de consulter le handover et de le signer via ce lien :\n\n'+url+'\n\n'+v('i_out'))}`;
+}
+
+/* ================= BOOT ================= */
+(function boot(){
+  const h=location.hash;
+  if(h.startsWith('#e=')){
+    let p; try{p=JSON.parse(decodeURIComponent(escape(atob(decodeURIComponent(h.slice(3))))))}catch(e){alert('Lien invalide');return}
+    $('appSortant').style.display='none'; $('appEntrant').style.display='block';
+    window.__sigOut=p.sig||'';
+    const mk=(id,val)=>{const el=document.createElement('input');el.type='hidden';el.id=id;el.value=val||'';document.body.appendChild(el)};
+    mk('i_date',p.d);mk('i_shift',p.s);mk('i_unit',p.u);mk('i_team',p.tm);mk('i_out',p.o);mk('i_in',p.i);mk('i_outfn',p.f);
+    mk('h_todo',p.todo);mk('h_done',p.done);
+    $('e_info').innerHTML=`<div><b>Date</b><span>${p.d||'—'}</span></div>
+      <div><b>Shift</b><span>${p.s||'—'}</span></div>
+      <div><b>Unité</b><span>${p.u||'—'}</span></div>
+      <div><b>Sortant</b><span>${p.o||'—'}</span></div>`;
+    const fmt=t=>(t||'').split('\n').filter(x=>x.trim()).map(x=>'• '+x).join('<br>')||'—';
+    $('e_done').innerHTML=fmt(p.done); $('e_todo').innerHTML=fmt(p.todo);
+    if(p.sig)$('e_sigout').src=p.sig; else $('e_sigout').parentElement.innerHTML='<div class="ph">Pas de signature transmise</div>';
+    return;
+  }
+  renderStops(); renderWorks(); show(1);
+})();
+</script>
+</body>
+</html>
