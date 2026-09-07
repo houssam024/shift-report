@@ -85,6 +85,7 @@ button{padding:12px 16px;border:none;border-radius:7px;font-size:14px;font-weigh
   <div class="bar"><div class="fill" id="fill"></div></div>
   <div class="steps"><span id="stepNum">1</span> / 5 — <span id="stepName">Informations</span></div>
 </div>
+<div id="draftInfo" style="background:#f1f4f9;color:#4a5568;font-size:11px;padding:7px 16px;border-bottom:1px solid #e4e7ee"></div>
 <div class="body">
 
 <!-- 1 INFOS -->
@@ -117,43 +118,16 @@ button{padding:12px 16px;border:none;border-radius:7px;font-size:14px;font-weigh
 <!-- 2 ARRETS -->
 <div class="sec" data-name="Arrêts">
   <h2>⚠️ Déclaration des arrêts</h2>
-  <div class="note">Ces arrêts partent dans le fichier Excel central des arrêts (SharePoint), séparément du Daily Report.</div>
-  <div id="stopList"></div>
-  <button class="b1 sm" onclick="openStop()">➕ Ajouter un arrêt</button>
-  <div id="stopForm" style="display:none;margin-top:14px"><div class="box">
-    <div class="g"><label>Type d'arrêt</label><select id="st_type">
-      <option value="">—</option><option>RAS</option><option>Subit</option><option>RAS H3</option><option>Planifié</option><option>Opportunité</option>
-    </select></div>
-    <div class="g"><label>Machine / Équipement</label><select id="st_eq">
-      <option value="">—</option>
-      <option>Gratteur GR2H1</option><option>Gratteur GR2H2</option>
-      <option>Convoyeur D31</option><option>Convoyeur D32</option><option>Convoyeur D33</option>
-      <option>Convoyeur D4</option><option>Convoyeur D5 H3</option><option>Convoyeur D6 H3</option>
-      <option>Convoyeur SA3 H3</option><option>Convoyeur RA</option><option>Convoyeur RB</option>
-      <option>Convoyeur RC</option><option>Convoyeur RD</option><option>Convoyeur RH</option>
-      <option>Convoyeur S01</option><option>Convoyeur SA</option><option>Convoyeur SB</option>
-      <option>Chariot CV1</option><option>Chariot CV2</option><option>Chariot CV3</option><option>Chariot CV4 H3</option>
-      <option>STACKER</option><option>U162</option><option>PE 162</option>
-      <option>Volet D3Bis</option><option>Volet D3Fut</option><option>Autre</option>
-    </select></div>
-    <div class="r2">
-      <div class="g"><label>Date début</label><input type="date" id="st_d1"></div>
-      <div class="g"><label>Heure début</label><input type="time" id="st_h1"></div>
-    </div>
-    <div class="r2">
-      <div class="g"><label>Date fin</label><input type="date" id="st_d2"></div>
-      <div class="g"><label>Heure fin</label><input type="time" id="st_h2"></div>
-    </div>
-    <div class="g"><label>Cause</label><textarea id="st_cause"></textarea></div>
-    <div class="g"><label>Actions réalisées</label><textarea id="st_act"></textarea></div>
-    <div class="g"><label>Efficacité de la solution</label><select id="st_eff">
-      <option value="">—</option><option>Solution provisoire</option><option>Solution à long terme</option>
-    </select></div>
-    <div style="display:flex;gap:8px">
-      <button class="b2 sm" onclick="closeStop()">Annuler</button>
-      <button class="b1 sm" onclick="saveStop()">✅ Enregistrer l'arrêt</button>
-    </div>
-  </div></div>
+  <div class="note">La saisie des arrêts se fait dans le formulaire Downtime Tracker. Les réponses alimentent directement le fichier Excel des arrêts sur SharePoint.</div>
+  <div class="box" style="text-align:center">
+    <p style="font-size:13px;color:#555;margin-bottom:14px">Ouvrez le formulaire, déclarez vos arrêts (un envoi par arrêt), puis revenez ici pour continuer le Daily Report.</p>
+    <button class="b1" style="width:100%" onclick="openStopsForm()">🔗 Ouvrir le Downtime Tracker</button>
+  </div>
+  <div class="g" style="margin-top:6px">
+    <label>Nombre d'arrêts déclarés pendant ce shift</label>
+    <input type="number" id="i_nbstops" min="0" placeholder="0">
+  </div>
+  <div class="warn">Ce nombre sert uniquement de repère dans le Daily Report. Le détail des arrêts reste dans le fichier Excel SharePoint.</div>
 </div>
 
 <!-- 3 TRAVAUX -->
@@ -231,13 +205,20 @@ button{padding:12px 16px;border:none;border-radius:7px;font-size:14px;font-weigh
   <h3>Fichiers du superviseur sortant</h3>
   <div class="dl">
     <button class="b3" onclick="dlDaily()">📊 Daily Report (.xlsx)</button>
-    <button class="b3" onclick="dlHandover()">📋 Handover (.doc signé)</button>
+    <button class="b2" id="btnHo" onclick="dlHandover()" disabled>🔒 Handover — en attente de la signature de l'entrant</button>
   </div>
-  <h3>Registre des arrêts (SharePoint)</h3>
-  <div class="dl"><button class="b1" onclick="dlStops()">⚠️ Exporter les arrêts (.xlsx)</button></div>
-  <h3>Superviseur entrant</h3>
+  <div class="warn" id="hoLockMsg">Le Handover ne peut être téléchargé qu'une fois signé par les <b>deux</b> superviseurs.</div>
+
+  <h3>1. Envoyer au superviseur entrant</h3>
   <div class="dl"><button class="b1" onclick="genLink()">🔗 Générer le lien de signature</button></div>
   <div id="linkOut"></div>
+
+  <h3>2. Recevoir sa signature</h3>
+  <div class="box">
+    <label>Collez ici le code de retour envoyé par le superviseur entrant</label>
+    <textarea id="retCode" placeholder="Collez le code reçu par WhatsApp ou mail…" style="font-size:12px;min-height:70px"></textarea>
+    <button class="b1 sm" style="width:100%;margin-top:8px" onclick="applyReturn()">🔓 Valider et débloquer le Handover</button>
+  </div>
 </div>
 
 <div class="nav">
@@ -261,6 +242,7 @@ button{padding:12px 16px;border:none;border-radius:7px;font-size:14px;font-weigh
     <button class="b1" style="width:100%" onclick="openPad('in')">✍️ Signer en plein écran</button>
   </div>
   <button class="b3" style="width:100%" onclick="dlHandoverFinal()">📋 Valider et télécharger le Handover signé</button>
+  <div id="retOut"></div>
 </div></div>
 
 <!-- ============ OVERLAY SIGNATURE ============ -->
@@ -283,7 +265,7 @@ button{padding:12px 16px;border:none;border-radius:7px;font-size:14px;font-weigh
 </div>
 
 <script>
-let step=1, stops=[], works={p:[],u:[],n:[]}, curW='p';
+let step=1, works={p:[],u:[],n:[]}, curW='p';
 const SIG={out:'',in:''};
 const $=id=>document.getElementById(id);
 const v=id=>($(id)?$(id).value:'')||'';
@@ -387,29 +369,14 @@ function show(n){
   $('fill').style.width=(n/secs.length*100)+'%';
   $('prev').disabled=n===1;
   $('next').style.display=n===secs.length?'none':'block';
-  if(n===5) sum();
+  if(n===5){sum();lockHandover()}
   window.scrollTo(0,0);
 }
 function go(d){show(step+d)}
 
-/* ================= ARRETS ================= */
-function openStop(){$('stopForm').style.display='block'}
-function closeStop(){$('stopForm').style.display='none';['st_type','st_eq','st_d1','st_h1','st_d2','st_h2','st_cause','st_act','st_eff'].forEach(i=>$(i).value='')}
-function dur(d1,h1,d2,h2){if(!d1||!h1||!d2||!h2)return'';const a=new Date(d1+'T'+h1),b=new Date(d2+'T'+h2);
-  const m=(b-a)/60000;return(isNaN(m)||m<0)?'':(m/60).toFixed(2)}
-function saveStop(){
-  const s={type:v('st_type'),eq:v('st_eq'),d1:v('st_d1'),h1:v('st_h1'),d2:v('st_d2'),h2:v('st_h2'),
-    cause:v('st_cause'),act:v('st_act'),eff:v('st_eff')};
-  s.dur=dur(s.d1,s.h1,s.d2,s.h2); stops.push(s); renderStops(); closeStop();
-}
-function renderStops(){
-  $('stopList').innerHTML=stops.length?stops.map((s,i)=>
-    `<div class="card stop"><div><b>${s.eq||'—'} — ${s.type||'—'}</b>
-     <span>${s.h1||'?'} → ${s.h2||'?'} · ${s.dur?s.dur+' h':'durée ?'}</span></div>
-     <button class="b4 sm" onclick="delStop(${i})">🗑️</button></div>`).join('')
-    :'<div class="empty">Aucun arrêt déclaré</div>';
-}
-function delStop(i){stops.splice(i,1);renderStops()}
+/* ================= ARRETS (Microsoft Forms) ================= */
+const STOPS_FORM_URL='https://forms.cloud.microsoft/Pages/ResponsePage.aspx?id=-lDbqIcnLEai1_2Kd7eHFNmk0Pq6ssRDpPEaHahEKKNUMkxBUkRPMzBMMjJXWE1KTkw1TEpXTEI4Mi4u';
+function openStopsForm(){window.open(STOPS_FORM_URL,'_blank','noopener')}
 
 /* ================= TRAVAUX ================= */
 const WT={p:{t:'📋 Travail planifié',num:'N° WO',desc:'Description'},
@@ -463,11 +430,12 @@ function sum(){
    <div><b>Sortant</b><span>${v('i_out')||'—'}</span></div>
    <div><b>Entrant</b><span>${v('i_in')||'—'}</span></div>
    <div><b>Effectif × heures</b><span>${wf} × ${hr} h</span></div>
-   <div><b>Arrêts déclarés</b><span>${stops.length}</span></div>
+   <div><b>Arrêts déclarés</b><span>${v('i_nbstops')||'0'}</span></div>
    <div><b>Travaux</b><span>${nb} (P:${works.p.length} / NP:${works.u.length} / J+1:${works.n.length})</span></div>
    <div><b>Temps réel total</b><span>${th.toFixed(1)} h</span></div>
    <div><b>Taux d'occupation</b><span>${taux}</span></div>
-   <div><b>Signature sortant</b><span>${SIG.out?'<span class="sigok">✅ signée</span>':'—'}</span></div>`;
+   <div><b>Signature sortant</b><span>${SIG.out?'<span class="sigok">✅ signée</span>':'—'}</span></div>
+   <div><b>Signature entrant</b><span>${SIG.in?'<span class="sigok">✅ reçue</span>':'⏳ en attente'}</span></div>`;
 }
 
 /* ================= EXPORTS ================= */
@@ -486,6 +454,7 @@ function dlDaily(){
   A.push(['Shift',v('i_shift'),'','Équipe',v('i_team')]);
   A.push(['Superviseur sortant',v('i_out'),'','Superviseur entrant',v('i_in')]);
   A.push(['Nombre of workforce',wf,'',"Nombre d'heures de travail",hr]);
+  A.push(["Nombre d'arrêts déclarés",v('i_nbstops')||0]);
   A.push(["Taux d'occupation Planned",cap?oP/cap:0,'',"Taux d'occupation Non Planned",cap?oU/cap:0]);
   A.push(["Taux d'occupation total",cap?(oP+oU)/cap:0]);A.push([]);
   const hdr=(n,d,c5,c6)=>['N° '+n,'Type','TAG Equipment',d,c5,c6,...RES,'Estimated total','Real total'];
@@ -502,18 +471,6 @@ function dlDaily(){
   ws['!cols']=[{wch:12},{wch:10},{wch:16},{wch:42},{wch:20},{wch:24}].concat(Array(12).fill({wch:11}),[{wch:14},{wch:12}]);
   const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,'Daily report');
   XLSX.writeFile(wb,`DR_${(v('i_date')||'sansdate').replace(/-/g,'_')}_${(v('i_shift')||'').slice(0,4)}.xlsx`);
-}
-function dlStops(){
-  if(!stops.length){alert('Aucun arrêt à exporter.');return}
-  const A=[['Date saisie','Date shift','Shift','Unité','Superviseur','Type arrêt','Machine',
-            'Date début','Heure début','Date fin','Heure fin','Durée (h)','Cause','Actions réalisées','Efficacité solution']];
-  const now=new Date().toISOString().slice(0,16).replace('T',' ');
-  stops.forEach(s=>A.push([now,v('i_date'),v('i_shift'),v('i_unit'),v('i_out'),s.type,s.eq,
-    s.d1,s.h1,s.d2,s.h2,s.dur?parseFloat(s.dur):'',s.cause,s.act,s.eff]));
-  const ws=XLSX.utils.aoa_to_sheet(A);
-  ws['!cols']=[{wch:16},{wch:12},{wch:14},{wch:14},{wch:20},{wch:13},{wch:20},{wch:12},{wch:10},{wch:12},{wch:10},{wch:10},{wch:38},{wch:38},{wch:20}];
-  const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,'Arrets');
-  XLSX.writeFile(wb,`ARRETS_${(v('i_date')||'sansdate').replace(/-/g,'_')}.xlsx`);
 }
 function hoHTML(so,si){
   const li=t=>(t||'').split('\n').filter(x=>x.trim()).map((x,i)=>`<tr><td width="30">${i+1}</td><td>${x}</td></tr>`).join('')||'<tr><td></td><td>—</td></tr>';
@@ -538,8 +495,53 @@ function hoHTML(so,si){
 }
 function saveDoc(html,name){const b=new Blob(['\ufeff'+html],{type:'application/msword'});
   const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download=name;a.click()}
-function dlHandover(){saveDoc(hoHTML(SIG.out,''),`HANDOVER_${(v('i_date')||'sansdate').replace(/-/g,'_')}.doc`)}
-function dlHandoverFinal(){saveDoc(hoHTML(window.__sigOut||'',SIG.in),`HANDOVER_SIGNE_${(v('i_date')||'doc').replace(/-/g,'_')}.doc`)}
+function dlHandover(){
+  if(!SIG.out){alert("Vous n'avez pas encore signé le handover (étape 4).");return}
+  if(!SIG.in){alert("Le superviseur entrant n'a pas encore signé.\n\nEnvoyez-lui le lien, puis collez son code de retour pour débloquer le fichier.");return}
+  saveDoc(hoHTML(SIG.out,SIG.in),`HANDOVER_SIGNE_${(v('i_date')||'sansdate').replace(/-/g,'_')}.doc`);
+}
+function lockHandover(){
+  const b=$('btnHo'), m=$('hoLockMsg'); if(!b) return;
+  if(SIG.in){
+    b.disabled=false; b.className='b3';
+    b.textContent='📋 Handover signé par les deux (.doc)';
+    m.className='note'; m.innerHTML='✅ Signature du superviseur entrant reçue. Le fichier est débloqué.';
+  }else{
+    b.disabled=true; b.className='b2';
+    b.textContent="🔒 Handover — en attente de la signature de l'entrant";
+    m.className='warn'; m.innerHTML='Le Handover ne peut être téléchargé qu\'une fois signé par les <b>deux</b> superviseurs.';
+  }
+}
+function applyReturn(){
+  const raw=(v('retCode')||'').trim();
+  if(!raw){alert('Collez d\'abord le code de retour.');return}
+  let code=raw; const i=raw.indexOf('#r=');
+  if(i>=0) code=raw.slice(i+3);
+  let d; try{d=JSON.parse(decodeURIComponent(escape(atob(decodeURIComponent(code)))))}catch(e){alert('Code invalide. Vérifiez que vous avez collé le code en entier.');return}
+  if(!d.sig){alert('Ce code ne contient aucune signature.');return}
+  SIG.in=d.sig; saveDraft(); lockHandover(); sum();
+  alert('✅ Signature du superviseur entrant enregistrée.\n\nVous pouvez maintenant télécharger le Handover.');
+}
+function dlHandoverFinal(){
+  if(!SIG.in){alert('Signez d\'abord dans le cadre ci-dessus.');return}
+  saveDoc(hoHTML(window.__sigOut||'',SIG.in),`HANDOVER_SIGNE_${(v('i_date')||'doc').replace(/-/g,'_')}.doc`);
+  showReturnCode();
+}
+function showReturnCode(){
+  const code=encodeURIComponent(btoa(unescape(encodeURIComponent(JSON.stringify({sig:SIG.in})))));
+  $('retOut').innerHTML=`<div class="box" style="margin-top:14px">
+    <label>📤 Code à renvoyer au superviseur sortant</label>
+    <p style="font-size:12px;color:#555;margin-bottom:8px">Sans ce code, il ne pourra pas télécharger le handover signé.</p>
+    <textarea readonly id="retTxt" style="font-size:11px;min-height:70px">#r=${code}</textarea>
+    <div style="display:flex;gap:8px;margin-top:8px">
+    <button class="b1 sm" onclick="navigator.clipboard.writeText($('retTxt').value);this.textContent='✅ Copié'">📋 Copier</button>
+    <button class="b1 sm" onclick="mailReturn()">✉️ Envoyer</button></div></div>`;
+}
+function mailReturn(){
+  const c=$('retTxt').value;
+  location.href='mailto:?subject='+encodeURIComponent('Handover signé — code de retour')
+    +'&body='+encodeURIComponent('Bonjour,\n\nJ\'ai signé le handover. Voici le code de retour à coller dans l\'application :\n\n'+c);
+}
 
 /* ================= LIEN ENTRANT ================= */
 function genLink(){
@@ -557,6 +559,53 @@ function mailLink(){
   location.href=`mailto:${v('i_inmail')}?subject=${encodeURIComponent('Handover à signer — '+v('i_date')+' '+v('i_shift'))}`
     +`&body=${encodeURIComponent('Bonjour '+v('i_in')+',\n\nMerci de consulter le handover et de le signer via ce lien :\n\n'+url+'\n\n'+v('i_out'))}`;
 }
+
+/* ================= SAUVEGARDE LOCALE ================= */
+const KEY='shiftreport_draft_v1';
+const FIELDS=['i_date','i_shift','i_unit','i_team','i_out','i_outfn','i_in','i_inmail','i_wf','i_hrs','i_nbstops','h_done','h_todo'];
+let saveTimer=null;
+
+function saveDraft(){
+  try{
+    const f={}; FIELDS.forEach(id=>f[id]=v(id));
+    localStorage.setItem(KEY,JSON.stringify({f,works,sig:SIG.out,sigIn:SIG.in,step,ts:Date.now()}));
+    flagSaved();
+  }catch(e){}
+}
+function saveSoon(){clearTimeout(saveTimer);saveTimer=setTimeout(saveDraft,400)}
+function flagSaved(){
+  const el=$('draftInfo'); if(!el) return;
+  el.innerHTML='💾 Brouillon enregistré à '+new Date().toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'})
+    +' &nbsp;·&nbsp; <a href="#" onclick="clearDraft();return false" style="color:#c62828">Nouveau shift</a>';
+}
+function loadDraft(){
+  let d; try{d=JSON.parse(localStorage.getItem(KEY))}catch(e){return false}
+  if(!d) return false;
+  const age=(Date.now()-(d.ts||0))/3600000;
+  const when=new Date(d.ts).toLocaleString('fr-FR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'});
+  if(!confirm(`Un brouillon du ${when} a été trouvé.\n\nOK = reprendre la saisie\nAnnuler = repartir de zéro`)){
+    localStorage.removeItem(KEY); return false;
+  }
+  FIELDS.forEach(id=>{if($(id)&&d.f&&d.f[id]!==undefined)$(id).value=d.f[id]});
+  works=d.works||{p:[],u:[],n:[]};
+  if(d.sig){SIG.out=d.sig; const s=$('prev_out'); if(s)s.innerHTML=`<img src="${d.sig}">`}
+  if(d.sigIn){SIG.in=d.sigIn}
+  renderWorks(); show(d.step||1); flagSaved();
+  return true;
+}
+function clearDraft(){
+  if(!confirm('Effacer le brouillon et recommencer un nouveau shift ?')) return;
+  localStorage.removeItem(KEY); location.reload();
+}
+/* déclencheurs */
+document.addEventListener('input',saveSoon,true);
+document.addEventListener('change',saveSoon,true);
+window.addEventListener('beforeunload',saveDraft);
+document.addEventListener('visibilitychange',()=>{if(document.hidden)saveDraft()});
+['saveWork','delWork','padValidate'].forEach(fn=>{
+  const orig=window[fn];
+  window[fn]=function(){const r=orig.apply(this,arguments);saveDraft();return r};
+});
 
 /* ================= BOOT ================= */
 (function boot(){
@@ -577,7 +626,8 @@ function mailLink(){
     if(p.sig)$('e_sigout').src=p.sig; else $('e_sigout').parentElement.innerHTML='<div class="ph">Pas de signature transmise</div>';
     return;
   }
-  renderStops(); renderWorks(); show(1);
+  renderWorks(); show(1);
+  if(localStorage.getItem(KEY)) loadDraft();
 })();
 </script>
 </body>
