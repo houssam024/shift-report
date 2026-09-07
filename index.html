@@ -195,7 +195,14 @@ button{padding:12px 16px;border:none;border-radius:7px;font-size:14px;font-weigh
     <div class="sigprev" id="prev_out"><div class="ph">Aucune signature</div></div>
     <button class="b1" style="width:100%" onclick="openPad('out')">✍️ Signer en plein écran</button>
   </div>
-  <div class="warn">Le superviseur entrant signera de son côté via le lien généré à l'étape suivante.</div>
+
+  <div class="sigslot">
+    <label>✍️ Signature — Superviseur ENTRANT</label>
+    <div class="sigprev" id="prev_in"><div class="ph">Aucune signature</div></div>
+    <button class="b1" style="width:100%" onclick="openPad('in')">✍️ Signer en plein écran</button>
+  </div>
+
+  <div class="note">Les deux superviseurs signent sur ce même téléphone, l'un après l'autre, au moment de la passation.</div>
 </div>
 
 <!-- 5 EXPORT -->
@@ -205,19 +212,17 @@ button{padding:12px 16px;border:none;border-radius:7px;font-size:14px;font-weigh
   <h3>Fichiers du superviseur sortant</h3>
   <div class="dl">
     <button class="b3" onclick="dlDaily()">📊 Daily Report (.xlsx)</button>
-    <button class="b2" id="btnHo" onclick="dlHandover()" disabled>🔒 Handover — en attente de la signature de l'entrant</button>
   </div>
-  <div class="warn" id="hoLockMsg">Le Handover ne peut être téléchargé qu'une fois signé par les <b>deux</b> superviseurs.</div>
 
-  <h3>1. Envoyer au superviseur entrant</h3>
-  <div class="dl"><button class="b1" onclick="genLink()">🔗 Générer le lien de signature</button></div>
-  <div id="linkOut"></div>
-
-  <h3>2. Recevoir sa signature</h3>
-  <div class="box">
-    <label>Collez ici le code de retour envoyé par le superviseur entrant</label>
-    <textarea id="retCode" placeholder="Collez le code reçu par WhatsApp ou mail…" style="font-size:12px;min-height:70px"></textarea>
-    <button class="b1 sm" style="width:100%;margin-top:8px" onclick="applyReturn()">🔓 Valider et débloquer le Handover</button>
+  <h3>Handover signé</h3>
+  <div class="warn" id="hoLockMsg">Les deux superviseurs doivent avoir signé à l'étape 4.</div>
+  <div class="g">
+    <label>Destinataires du handover</label>
+    <input type="email" id="i_mailto" placeholder="chef@ocpgroup.ma ; superviseur@ocpgroup.ma">
+  </div>
+  <div class="dl">
+    <button class="b1" id="btnMail" onclick="shareHandover()" disabled>1️⃣ ✉️ Partager le handover par mail</button>
+    <button class="b2" id="btnHo" onclick="dlHandover()" disabled>2️⃣ 🔒 Télécharger le handover (.doc)</button>
   </div>
 </div>
 
@@ -225,24 +230,6 @@ button{padding:12px 16px;border:none;border-radius:7px;font-size:14px;font-weigh
   <button class="b2" id="prev" onclick="go(-1)" disabled>← Précédent</button>
   <button class="b1" id="next" onclick="go(1)">Suivant →</button>
 </div>
-</div></div>
-
-<!-- ============ ENTRANT ============ -->
-<div class="container" id="appEntrant" style="display:none">
-<div class="header"><h1>✋ Handover — Signature</h1><p>Superviseur entrant</p></div>
-<div class="body">
-  <div class="sum" id="e_info"></div>
-  <h3>✅ Completed Actions</h3><div class="box" id="e_done"></div>
-  <h3>📌 Actions to Complete</h3><div class="box" id="e_todo"></div>
-  <h3>Signature du superviseur sortant</h3>
-  <div class="sigprev"><img id="e_sigout"></div>
-  <div class="sigslot" style="margin-top:16px">
-    <label>✍️ Votre signature — Superviseur ENTRANT</label>
-    <div class="sigprev" id="prev_in"><div class="ph">Aucune signature</div></div>
-    <button class="b1" style="width:100%" onclick="openPad('in')">✍️ Signer en plein écran</button>
-  </div>
-  <button class="b3" style="width:100%" onclick="dlHandoverFinal()">📋 Valider et télécharger le Handover signé</button>
-  <div id="retOut"></div>
 </div></div>
 
 <!-- ============ OVERLAY SIGNATURE ============ -->
@@ -343,6 +330,7 @@ function padValidate(){
   const slot=$(padTarget==='out'?'prev_out':'prev_in');
   slot.innerHTML=`<img src="${SIG[padTarget]}">`;
   closePad();
+  lockHandover();
 }
 /* recadre la signature sur son encre */
 function trimSig(c){
@@ -435,7 +423,7 @@ function sum(){
    <div><b>Temps réel total</b><span>${th.toFixed(1)} h</span></div>
    <div><b>Taux d'occupation</b><span>${taux}</span></div>
    <div><b>Signature sortant</b><span>${SIG.out?'<span class="sigok">✅ signée</span>':'—'}</span></div>
-   <div><b>Signature entrant</b><span>${SIG.in?'<span class="sigok">✅ reçue</span>':'⏳ en attente'}</span></div>`;
+   <div><b>Signature entrant</b><span>${SIG.in?'<span class="sigok">✅ signée</span>':'—'}</span></div>`;
 }
 
 /* ================= EXPORTS ================= */
@@ -496,79 +484,51 @@ function hoHTML(so,si){
 function saveDoc(html,name){const b=new Blob(['\ufeff'+html],{type:'application/msword'});
   const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download=name;a.click()}
 function dlHandover(){
-  if(!SIG.out){alert("Vous n'avez pas encore signé le handover (étape 4).");return}
-  if(!SIG.in){alert("Le superviseur entrant n'a pas encore signé.\n\nEnvoyez-lui le lien, puis collez son code de retour pour débloquer le fichier.");return}
+  if(!(SIG.out&&SIG.in)){alert('Les deux signatures sont nécessaires (étape 4).');return}
+  if(!mailSent){alert("Partagez d'abord le handover par mail (bouton 1).");return}
   saveDoc(hoHTML(SIG.out,SIG.in),`HANDOVER_SIGNE_${(v('i_date')||'sansdate').replace(/-/g,'_')}.doc`);
 }
+let mailSent=false;
+function shareHandover(){
+  if(!(SIG.out&&SIG.in)){alert('Les deux signatures sont nécessaires (étape 4).');return}
+  const dest=(v('i_mailto')||v('i_inmail')||'').replace(/\s*;\s*/g,',');
+  const sujet='Handover '+(v('i_date')||'')+' — '+(v('i_shift')||'')+' — '+(v('i_unit')||'');
+  const done=(v('h_done')||'').split('\n').filter(x=>x.trim()).map(x=>'• '+x).join('\n')||'—';
+  const todo=(v('h_todo')||'').split('\n').filter(x=>x.trim()).map(x=>'• '+x).join('\n')||'—';
+  const corps='Bonjour,\n\nHandover du '+(v('i_date')||'')+' — shift '+(v('i_shift')||'')
+    +'\nUnité : '+(v('i_unit')||'')+'\nSortant : '+(v('i_out')||'')+'\nEntrant : '+(v('i_in')||'')
+    +'\n\nACTIONS RÉALISÉES\n'+done
+    +'\n\nACTIONS À COMPLÉTER\n'+todo
+    +'\n\nLe document signé par les deux superviseurs est joint.\n\nCordialement,\n'+(v('i_out')||'');
+  mailSent=true; saveDraft(); lockHandover();
+  location.href='mailto:'+encodeURIComponent(dest)+'?subject='+encodeURIComponent(sujet)+'&body='+encodeURIComponent(corps);
+}
 function lockHandover(){
-  const b=$('btnHo'), m=$('hoLockMsg'); if(!b) return;
-  if(SIG.in){
-    b.disabled=false; b.className='b3';
-    b.textContent='📋 Handover signé par les deux (.doc)';
-    m.className='note'; m.innerHTML='✅ Signature du superviseur entrant reçue. Le fichier est débloqué.';
+  const bm=$('btnMail'), b=$('btnHo'), m=$('hoLockMsg'); if(!b) return;
+  const both=SIG.out&&SIG.in;
+  bm.disabled=!both; bm.className=both?'b1':'b2';
+  if(!both){
+    b.disabled=true; b.className='b2'; b.textContent='2️⃣ 🔒 Télécharger le handover (.doc)';
+    m.className='warn'; m.innerHTML="Les deux superviseurs doivent avoir signé à l'étape 4.";
+    return;
+  }
+  if(!mailSent){
+    b.disabled=true; b.className='b2'; b.textContent='2️⃣ 🔒 Télécharger le handover (.doc)';
+    m.className='note'; m.innerHTML='✅ Les deux signatures sont enregistrées. Partagez le handover par mail (bouton 1) pour débloquer le téléchargement.';
   }else{
-    b.disabled=true; b.className='b2';
-    b.textContent="🔒 Handover — en attente de la signature de l'entrant";
-    m.className='warn'; m.innerHTML='Le Handover ne peut être téléchargé qu\'une fois signé par les <b>deux</b> superviseurs.';
+    b.disabled=false; b.className='b3'; b.textContent='2️⃣ 📋 Télécharger le handover signé (.doc)';
+    m.className='note'; m.innerHTML='✅ Handover partagé. Le téléchargement est débloqué.';
   }
 }
-function applyReturn(){
-  const raw=(v('retCode')||'').trim();
-  if(!raw){alert('Collez d\'abord le code de retour.');return}
-  let code=raw; const i=raw.indexOf('#r=');
-  if(i>=0) code=raw.slice(i+3);
-  let d; try{d=JSON.parse(decodeURIComponent(escape(atob(decodeURIComponent(code)))))}catch(e){alert('Code invalide. Vérifiez que vous avez collé le code en entier.');return}
-  if(!d.sig){alert('Ce code ne contient aucune signature.');return}
-  SIG.in=d.sig; saveDraft(); lockHandover(); sum();
-  alert('✅ Signature du superviseur entrant enregistrée.\n\nVous pouvez maintenant télécharger le Handover.');
-}
-function dlHandoverFinal(){
-  if(!SIG.in){alert('Signez d\'abord dans le cadre ci-dessus.');return}
-  saveDoc(hoHTML(window.__sigOut||'',SIG.in),`HANDOVER_SIGNE_${(v('i_date')||'doc').replace(/-/g,'_')}.doc`);
-  showReturnCode();
-}
-function showReturnCode(){
-  const code=encodeURIComponent(btoa(unescape(encodeURIComponent(JSON.stringify({sig:SIG.in})))));
-  $('retOut').innerHTML=`<div class="box" style="margin-top:14px">
-    <label>📤 Code à renvoyer au superviseur sortant</label>
-    <p style="font-size:12px;color:#555;margin-bottom:8px">Sans ce code, il ne pourra pas télécharger le handover signé.</p>
-    <textarea readonly id="retTxt" style="font-size:11px;min-height:70px">#r=${code}</textarea>
-    <div style="display:flex;gap:8px;margin-top:8px">
-    <button class="b1 sm" onclick="navigator.clipboard.writeText($('retTxt').value);this.textContent='✅ Copié'">📋 Copier</button>
-    <button class="b1 sm" onclick="mailReturn()">✉️ Envoyer</button></div></div>`;
-}
-function mailReturn(){
-  const c=$('retTxt').value;
-  location.href='mailto:?subject='+encodeURIComponent('Handover signé — code de retour')
-    +'&body='+encodeURIComponent('Bonjour,\n\nJ\'ai signé le handover. Voici le code de retour à coller dans l\'application :\n\n'+c);
-}
-
-/* ================= LIEN ENTRANT ================= */
-function genLink(){
-  const p={d:v('i_date'),s:v('i_shift'),u:v('i_unit'),tm:v('i_team'),o:v('i_out'),i:v('i_in'),f:v('i_outfn'),
-    todo:v('h_todo'),done:v('h_done'),sig:SIG.out};
-  const url=location.origin+location.pathname+'#e='+encodeURIComponent(btoa(unescape(encodeURIComponent(JSON.stringify(p)))));
-  $('linkOut').innerHTML=`<div class="box"><label>Lien à envoyer à ${v('i_in')||"l'entrant"} :</label>
-    <textarea readonly style="font-size:11px;min-height:70px">${url}</textarea>
-    <div style="display:flex;gap:8px;margin-top:8px">
-    <button class="b1 sm" onclick="navigator.clipboard.writeText(document.querySelector('#linkOut textarea').value);this.textContent='✅ Copié'">📋 Copier</button>
-    <button class="b1 sm" onclick="mailLink()">✉️ Email</button></div></div>`;
-}
-function mailLink(){
-  const url=document.querySelector('#linkOut textarea').value;
-  location.href=`mailto:${v('i_inmail')}?subject=${encodeURIComponent('Handover à signer — '+v('i_date')+' '+v('i_shift'))}`
-    +`&body=${encodeURIComponent('Bonjour '+v('i_in')+',\n\nMerci de consulter le handover et de le signer via ce lien :\n\n'+url+'\n\n'+v('i_out'))}`;
-}
-
 /* ================= SAUVEGARDE LOCALE ================= */
 const KEY='shiftreport_draft_v1';
-const FIELDS=['i_date','i_shift','i_unit','i_team','i_out','i_outfn','i_in','i_inmail','i_wf','i_hrs','i_nbstops','h_done','h_todo'];
+const FIELDS=['i_date','i_shift','i_unit','i_team','i_out','i_outfn','i_in','i_inmail','i_wf','i_hrs','i_nbstops','i_mailto','h_done','h_todo'];
 let saveTimer=null;
 
 function saveDraft(){
   try{
     const f={}; FIELDS.forEach(id=>f[id]=v(id));
-    localStorage.setItem(KEY,JSON.stringify({f,works,sig:SIG.out,sigIn:SIG.in,step,ts:Date.now()}));
+    localStorage.setItem(KEY,JSON.stringify({f,works,sig:SIG.out,sigIn:SIG.in,mailSent,step,ts:Date.now()}));
     flagSaved();
   }catch(e){}
 }
@@ -589,8 +549,20 @@ function loadDraft(){
   FIELDS.forEach(id=>{if($(id)&&d.f&&d.f[id]!==undefined)$(id).value=d.f[id]});
   works=d.works||{p:[],u:[],n:[]};
   if(d.sig){SIG.out=d.sig; const s=$('prev_out'); if(s)s.innerHTML=`<img src="${d.sig}">`}
-  if(d.sigIn){SIG.in=d.sigIn}
+  if(d.sigIn){SIG.in=d.sigIn; const t=$('prev_in'); if(t)t.innerHTML=`<img src="${d.sigIn}">`}
+  mailSent=!!d.mailSent;
   renderWorks(); show(d.step||1); flagSaved();
+  return true;
+}
+function loadDraftSilent(){
+  let d; try{d=JSON.parse(localStorage.getItem(KEY))}catch(e){return false}
+  if(!d) return false;
+  FIELDS.forEach(id=>{if($(id)&&d.f&&d.f[id]!==undefined)$(id).value=d.f[id]});
+  works=d.works||{p:[],u:[],n:[]};
+  if(d.sig){SIG.out=d.sig; const s=$('prev_out'); if(s)s.innerHTML=`<img src="${d.sig}">`}
+  if(d.sigIn){SIG.in=d.sigIn; const t=$('prev_in'); if(t)t.innerHTML=`<img src="${d.sigIn}">`}
+  mailSent=!!d.mailSent;
+  renderWorks(); flagSaved();
   return true;
 }
 function clearDraft(){
@@ -609,23 +581,6 @@ document.addEventListener('visibilitychange',()=>{if(document.hidden)saveDraft()
 
 /* ================= BOOT ================= */
 (function boot(){
-  const h=location.hash;
-  if(h.startsWith('#e=')){
-    let p; try{p=JSON.parse(decodeURIComponent(escape(atob(decodeURIComponent(h.slice(3))))))}catch(e){alert('Lien invalide');return}
-    $('appSortant').style.display='none'; $('appEntrant').style.display='block';
-    window.__sigOut=p.sig||'';
-    const mk=(id,val)=>{const el=document.createElement('input');el.type='hidden';el.id=id;el.value=val||'';document.body.appendChild(el)};
-    mk('i_date',p.d);mk('i_shift',p.s);mk('i_unit',p.u);mk('i_team',p.tm);mk('i_out',p.o);mk('i_in',p.i);mk('i_outfn',p.f);
-    mk('h_todo',p.todo);mk('h_done',p.done);
-    $('e_info').innerHTML=`<div><b>Date</b><span>${p.d||'—'}</span></div>
-      <div><b>Shift</b><span>${p.s||'—'}</span></div>
-      <div><b>Unité</b><span>${p.u||'—'}</span></div>
-      <div><b>Sortant</b><span>${p.o||'—'}</span></div>`;
-    const fmt=t=>(t||'').split('\n').filter(x=>x.trim()).map(x=>'• '+x).join('<br>')||'—';
-    $('e_done').innerHTML=fmt(p.done); $('e_todo').innerHTML=fmt(p.todo);
-    if(p.sig)$('e_sigout').src=p.sig; else $('e_sigout').parentElement.innerHTML='<div class="ph">Pas de signature transmise</div>';
-    return;
-  }
   renderWorks(); show(1);
   if(localStorage.getItem(KEY)) loadDraft();
 })();
