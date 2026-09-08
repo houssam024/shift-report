@@ -2,588 +2,821 @@
 <html lang="fr">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-<title>Daily Report & Handover</title>
-<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="theme-color" content="#141B22">
+<title>Passation de poste — Convoyeurs & Stockage</title>
+<script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
 <style>
+:root{
+  --ink:#141B22;      /* graphite structure */
+  --slate:#26313C;
+  --steel:#6A7885;
+  --line:#D9DEE4;
+  --paper:#FFFFFF;
+  --wash:#F4F6F8;
+  --sulfur:#F2B705;   /* jaune soufre : la matière du terminal */
+  --sulfur-dk:#C08F00;
+  --go:#1F7A45;
+  --stop:#B3261E;
+}
 *{margin:0;padding:0;box-sizing:border-box}
-html,body{overscroll-behavior:none}
-body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif;background:#eef0f6;padding:8px}
-body.noscroll{overflow:hidden;height:100%;position:fixed;width:100%}
-.container{max-width:680px;margin:0 auto;background:#fff;border-radius:14px;overflow:hidden;box-shadow:0 8px 30px rgba(0,0,0,.15)}
-.header{background:linear-gradient(135deg,#1f4e79,#2e7d8f);color:#fff;padding:16px}
-.header h1{font-size:18px}
-.header p{font-size:12px;opacity:.85;margin-top:3px}
-.bar{height:4px;background:rgba(255,255,255,.3);border-radius:2px;margin-top:12px;overflow:hidden}
-.fill{height:100%;background:#fff;width:20%;transition:.3s}
-.steps{font-size:11px;margin-top:6px;opacity:.9}
-.body{padding:18px 16px}
-.sec{display:none}.sec.on{display:block}
-h2{font-size:16px;color:#1f4e79;border-bottom:2px solid #1f4e79;padding-bottom:8px;margin-bottom:16px}
-h3{font-size:13px;color:#2e7d8f;margin:14px 0 8px}
-label{display:block;font-size:13px;font-weight:600;color:#333;margin-bottom:5px}
-input,select,textarea{width:100%;padding:11px;border:1.5px solid #d8dbe3;border-radius:7px;font-size:16px;font-family:inherit;background:#fff}
-input:focus,select:focus,textarea:focus{outline:none;border-color:#2e7d8f}
-textarea{min-height:80px;resize:vertical}
-.g{margin-bottom:14px}
-.r2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
-button{padding:12px 16px;border:none;border-radius:7px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit}
-.b1{background:linear-gradient(135deg,#1f4e79,#2e7d8f);color:#fff}
-.b2{background:#e4e7ee;color:#333}
-.b3{background:#2e7d32;color:#fff}
-.b4{background:#c62828;color:#fff}
-.sm{padding:8px 11px;font-size:12px}
-.nav{display:flex;gap:8px;margin-top:22px;padding-top:16px;border-top:1px solid #e4e7ee}
+html{-webkit-text-size-adjust:100%}
+body{
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;
+  background:var(--wash);color:var(--ink);
+  font-size:16px;line-height:1.5;
+  overscroll-behavior:none;
+}
+body.noscroll{overflow:hidden;position:fixed;width:100%;height:100%}
+
+.shell{max-width:640px;margin:0 auto;background:var(--paper);min-height:100vh;
+  box-shadow:0 0 0 1px var(--line)}
+
+/* ---------- en-tête ---------- */
+.top{background:var(--ink);color:#fff;padding:16px 18px 0}
+.top .title{font-size:17px;font-weight:650;letter-spacing:-.01em}
+.top .meta{font-size:12.5px;color:#9BA8B4;margin-top:2px}
+.top .meta b{color:var(--sulfur);font-weight:600}
+
+/* barre de progression segmentée */
+.belt{display:flex;gap:3px;margin-top:14px}
+.belt i{flex:1;height:5px;background:#333F4B;border-radius:1px;transition:background .25s}
+.belt i.done{background:#4A5866}
+.belt i.now{background:var(--sulfur)}
+.stepline{display:flex;justify-content:space-between;align-items:baseline;
+  padding:9px 0 13px;font-size:12.5px;color:#9BA8B4}
+.stepline b{color:#fff;font-weight:600;font-size:13.5px}
+
+.draftbar{background:#FDF6DE;border-bottom:1px solid #EBDFB4;color:#6B5A16;
+  font-size:12px;padding:8px 18px;display:flex;justify-content:space-between;gap:10px}
+.draftbar a{color:var(--stop);font-weight:600;text-decoration:none}
+
+.page{padding:22px 18px 32px}
+.view{display:none}
+.view.on{display:block}
+
+h2{font-size:20px;font-weight:650;letter-spacing:-.02em;margin-bottom:4px}
+.lead{color:var(--steel);font-size:13.5px;margin-bottom:20px;max-width:56ch}
+h3{font-size:13px;font-weight:650;color:var(--slate);margin:24px 0 10px;
+  padding-bottom:6px;border-bottom:1px solid var(--line)}
+
+/* ---------- champs ---------- */
+.f{margin-bottom:15px}
+label{display:block;font-size:13px;font-weight:600;color:var(--slate);margin-bottom:6px}
+input,select,textarea{
+  width:100%;padding:13px 12px;font:inherit;font-size:16px;
+  border:1px solid var(--line);border-radius:6px;background:var(--paper);color:var(--ink);
+  transition:border-color .15s,box-shadow .15s}
+input:focus,select:focus,textarea:focus{
+  outline:none;border-color:var(--ink);box-shadow:0 0 0 3px rgba(242,183,5,.28)}
+input[readonly]{background:var(--wash);color:var(--steel)}
+textarea{min-height:96px;resize:vertical;line-height:1.55}
+.duo{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.hint{font-size:12px;color:var(--steel);margin-top:5px}
+
+/* ---------- boutons ---------- */
+button{font:inherit;font-size:15px;font-weight:600;border:none;border-radius:6px;
+  padding:14px 18px;cursor:pointer;min-height:48px;transition:filter .15s}
+button:active{filter:brightness(.94)}
+button:focus-visible{outline:3px solid var(--sulfur);outline-offset:2px}
+.k-main{background:var(--ink);color:#fff}
+.k-go{background:var(--go);color:#fff}
+.k-flat{background:var(--wash);color:var(--slate);border:1px solid var(--line)}
+.k-off{background:var(--wash);color:#9AA5B0;border:1px solid var(--line);cursor:not-allowed}
+.k-del{background:none;color:var(--stop);border:1px solid #E9C9C6;padding:8px 12px;
+  min-height:auto;font-size:13px}
+.k-wide{width:100%}
+.k-sm{padding:10px 14px;font-size:13.5px;min-height:42px}
+.stack{display:flex;flex-direction:column;gap:10px}
+
+/* ---------- panneaux ---------- */
+.panel{border:1px solid var(--line);border-radius:8px;padding:16px;background:var(--paper)}
+.panel-fill{background:var(--wash);border-color:transparent}
+.tell{font-size:13px;line-height:1.5;padding:12px 14px;border-radius:6px;
+  border-left:3px solid var(--slate);background:var(--wash);color:var(--slate);margin-bottom:16px}
+.tell-wait{border-left-color:var(--sulfur);background:#FDF6DE;color:#6B5A16}
+.tell-ok{border-left-color:var(--go);background:#EAF4EE;color:#1B5B36}
+
+/* liste des travaux */
+.item{display:flex;gap:12px;align-items:flex-start;padding:13px 0;border-bottom:1px solid var(--line)}
+.item:last-child{border-bottom:none}
+.item .body{flex:1;min-width:0}
+.item .ref{font-size:14px;font-weight:650;letter-spacing:-.01em}
+.item .sub{font-size:12.5px;color:var(--steel);margin-top:2px;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.item .hrs{font-size:12.5px;color:var(--slate);margin-top:3px;font-variant-numeric:tabular-nums}
+.blank{color:var(--steel);font-size:13px;padding:22px 0;text-align:center}
+
+/* onglets travaux */
+.pick{display:flex;border:1px solid var(--line);border-radius:6px;overflow:hidden;margin-bottom:18px}
+.pick button{flex:1;background:var(--paper);color:var(--steel);border-radius:0;padding:11px 6px;
+  font-size:12.5px;line-height:1.3;border-right:1px solid var(--line)}
+.pick button:last-child{border-right:none}
+.pick button.sel{background:var(--ink);color:#fff}
+
+/* signatures */
+.sign{border:1px solid var(--line);border-radius:8px;padding:16px;margin-bottom:14px}
+.sign.filled{border-color:var(--go)}
+.sign .who{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
+.sign .who span{font-size:13px;font-weight:650;color:var(--slate)}
+.sign .state{font-size:12px;color:var(--steel);font-weight:500}
+.sign.filled .state{color:var(--go)}
+.plate{border:1px dashed var(--line);border-radius:6px;background:var(--wash);
+  min-height:96px;display:flex;align-items:center;justify-content:center;margin-bottom:12px;overflow:hidden}
+.plate img{max-width:100%;max-height:130px;display:block}
+.plate .none{color:#9AA5B0;font-size:12.5px}
+
+/* récapitulatif */
+.recap{border:1px solid var(--line);border-radius:8px;overflow:hidden;margin-bottom:6px}
+.recap div{display:flex;justify-content:space-between;gap:14px;padding:11px 14px;
+  font-size:13.5px;border-bottom:1px solid var(--line)}
+.recap div:last-child{border-bottom:none}
+.recap div:nth-child(odd){background:var(--wash)}
+.recap b{font-weight:600;color:var(--steel)}
+.recap span{text-align:right;font-variant-numeric:tabular-nums}
+
+/* navigation */
+.nav{display:flex;gap:10px;margin-top:28px;padding-top:18px;border-top:1px solid var(--line)}
 .nav button{flex:1}
-.card{background:#f7f8fb;border-left:4px solid #2e7d8f;border-radius:6px;padding:11px;margin-bottom:9px;display:flex;justify-content:space-between;align-items:center;gap:8px}
-.card.stop{border-left-color:#e65100}.card.np{border-left-color:#f9a825}.card.nd{border-left-color:#6a1b9a}
-.card b{font-size:13px;display:block}.card span{font-size:11px;color:#666}
-.box{background:#f7f8fb;border-radius:8px;padding:14px;margin-bottom:14px;border:1.5px solid #d8dbe3}
-.note{background:#e8f4fd;border-left:3px solid #2196f3;padding:10px;border-radius:5px;font-size:12px;color:#0d47a1;margin-bottom:14px}
-.warn{background:#fff4e5;border-left:3px solid #ef6c00;padding:10px;border-radius:5px;font-size:12px;color:#e65100;margin-bottom:14px}
-.empty{text-align:center;color:#999;font-size:12px;padding:16px}
-.sum{background:#f7f8fb;border-radius:8px;padding:14px;font-size:13px}
-.sum div{display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #e4e7ee}
-.sum div:last-child{border:none}.sum b{color:#555;font-weight:600}
-.dl{display:flex;flex-direction:column;gap:9px;margin:14px 0}.dl button{width:100%}
-.tabs{display:flex;gap:6px;margin-bottom:14px}
-.tabs button{flex:1;font-size:11px;padding:9px 4px}
-.tabs button.act{background:linear-gradient(135deg,#1f4e79,#2e7d8f);color:#fff}
-.tabs button:not(.act){background:#e4e7ee;color:#555}
 
-/* --- bloc signature (aperçu) --- */
-.sigslot{background:#f7f8fb;border:1.5px solid #2e7d8f;border-radius:8px;padding:14px;margin-bottom:14px}
-.sigprev{border:1.5px dashed #b0b6c3;border-radius:6px;background:#fff;min-height:90px;display:flex;align-items:center;justify-content:center;margin:10px 0;overflow:hidden}
-.sigprev img{max-width:100%;max-height:120px;display:block}
-.sigprev .ph{color:#9aa2b1;font-size:12px;padding:26px 10px;text-align:center}
-.sigok{color:#2e7d32;font-size:12px;font-weight:600}
+/* ---------- écran d'accueil ---------- */
+.gate{padding:34px 20px 40px}
+.gate .brand{font-size:12.5px;color:var(--steel);margin-bottom:26px}
+.gate h1{font-size:27px;font-weight:650;letter-spacing:-.025em;line-height:1.2}
+.gate .sub{color:var(--steel);font-size:14px;margin:8px 0 28px;max-width:44ch}
+.resume{border:1px solid var(--sulfur);border-radius:8px;padding:16px;background:#FDF6DE;margin-bottom:16px}
+.resume .lbl{font-size:12px;color:#6B5A16;margin-bottom:6px}
+.resume .nm{font-size:16px;font-weight:650;margin-bottom:2px}
+.resume .dt{font-size:13px;color:#6B5A16;margin-bottom:14px}
 
-/* --- overlay plein écran --- */
-#padOverlay{position:fixed;inset:0;background:#0e1b2a;z-index:9999;display:none;flex-direction:column;touch-action:none}
-#padOverlay.on{display:flex}
-.padTop{color:#fff;padding:12px 14px;display:flex;justify-content:space-between;align-items:center;flex:0 0 auto}
-.padTop b{font-size:14px}
-.padTop small{display:block;font-size:11px;opacity:.7;margin-top:2px}
-.padStage{flex:1 1 auto;padding:0 10px;display:flex}
-.padCanvasWrap{flex:1;background:#fff;border-radius:10px;position:relative;overflow:hidden}
-#padCanvas{display:block;width:100%;height:100%;touch-action:none;background:#fff}
-.padGuide{position:absolute;left:8%;right:8%;bottom:22%;border-bottom:2px solid #e3e7ee;pointer-events:none}
-.padGuide::after{content:'✕';position:absolute;left:-4px;bottom:2px;color:#c9ced8;font-size:14px}
-.padBottom{flex:0 0 auto;padding:12px 10px calc(12px + env(safe-area-inset-bottom));display:flex;gap:8px}
-.padBottom button{flex:1;padding:15px 10px;font-size:15px}
-.rotate{color:#ffd54f;font-size:11px;text-align:center;padding:4px 0}
-@media(max-width:480px){.r2{grid-template-columns:1fr}.nav{flex-direction:column}}
+/* ---------- pad signature ---------- */
+#pad{position:fixed;inset:0;background:var(--ink);z-index:99;display:none;flex-direction:column;touch-action:none}
+#pad.on{display:flex}
+.pad-hd{padding:14px 16px;color:#fff;display:flex;justify-content:space-between;align-items:center;gap:12px}
+.pad-hd b{font-size:15px;font-weight:650;display:block}
+.pad-hd small{font-size:12px;color:#9BA8B4}
+.pad-hd button{background:#2B3642;color:#fff;padding:9px 14px;min-height:auto;font-size:13px}
+.pad-area{flex:1;margin:0 12px;background:#fff;border-radius:8px;position:relative;overflow:hidden}
+#padc{display:block;width:100%;height:100%;touch-action:none;background:#fff}
+.rule{position:absolute;left:9%;right:9%;bottom:23%;border-bottom:1.5px solid #E3E7EC;pointer-events:none}
+.pad-ft{display:flex;gap:10px;padding:12px 12px calc(12px + env(safe-area-inset-bottom))}
+.pad-ft button{flex:1;padding:16px}
+.pad-ft .cl{background:#2B3642;color:#fff}
+.pad-ft .ok{background:var(--sulfur);color:var(--ink)}
+
+@media (max-width:400px){.duo{grid-template-columns:1fr}.nav{flex-direction:column}}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
 </style>
 </head>
 <body>
 
-<!-- ============ SORTANT ============ -->
-<div class="container" id="appSortant">
-<div class="header">
-  <h1>📋 Daily Report & Handover</h1>
-  <p>Superviseur sortant — remplissage</p>
-  <div class="bar"><div class="fill" id="fill"></div></div>
-  <div class="steps"><span id="stepNum">1</span> / 5 — <span id="stepName">Informations</span></div>
-</div>
-<div id="draftInfo" style="background:#f1f4f9;color:#4a5568;font-size:11px;padding:7px 16px;border-bottom:1px solid #e4e7ee"></div>
-<div class="body">
+<div class="shell">
 
-<!-- 1 INFOS -->
-<div class="sec on" data-name="Informations">
-  <h2>📅 Informations générales</h2>
-  <div class="r2">
-    <div class="g"><label>Date</label><input type="date" id="i_date"></div>
-    <div class="g"><label>Shift</label><select id="i_shift">
-      <option value="">—</option><option>1er (06h-14h)</option><option>2ème (14h-22h)</option><option>3ème (22h-06h)</option>
-    </select></div>
+<!-- ============ ÉCRAN D'ACCUEIL ============ -->
+<div id="gate" class="gate">
+  <div class="brand">JESA · Asset Management — Convoyeurs &amp; Stockage</div>
+  <h1>Passation de poste</h1>
+  <p class="sub">Rapport d'activité, arrêts et handover pour un shift. Comptez cinq minutes.</p>
+
+  <div id="resumeCard"></div>
+
+  <div class="stack">
+    <button class="k-main k-wide" onclick="startFresh()">Commencer un rapport</button>
   </div>
-  <div class="r2">
-    <div class="g"><label>Unité / Zone</label><input type="text" id="i_unit" placeholder="Convoyeurs, H3, Port…"></div>
-    <div class="g"><label>Équipe (A/B/C/D)</label><input type="text" id="i_team" placeholder="A"></div>
-  </div>
-  <div class="r2">
-    <div class="g"><label>Superviseur sortant</label><input type="text" id="i_out" placeholder="Nom complet"></div>
-    <div class="g"><label>Fonction</label><input type="text" id="i_outfn" placeholder="E/I Supervisor"></div>
-  </div>
-  <div class="r2">
-    <div class="g"><label>Superviseur entrant</label><input type="text" id="i_in" placeholder="Nom complet"></div>
-    <div class="g"><label>Email superviseur entrant</label><input type="email" id="i_inmail" placeholder="nom@ocpgroup.ma"></div>
-  </div>
-  <div class="r2">
-    <div class="g"><label>Effectif (nombre)</label><input type="number" id="i_wf" min="0" placeholder="0"></div>
-    <div class="g"><label>Heures de travail</label><input type="number" id="i_hrs" min="0" step="0.5" placeholder="8"></div>
-  </div>
+  <p class="hint" style="margin-top:16px">Les données restent sur ce téléphone jusqu'à ce que vous exportiez les fichiers.</p>
 </div>
 
-<!-- 2 ARRETS -->
-<div class="sec" data-name="Arrêts">
-  <h2>⚠️ Déclaration des arrêts</h2>
-  <div class="note">La saisie des arrêts se fait dans le formulaire Downtime Tracker. Les réponses alimentent directement le fichier Excel des arrêts sur SharePoint.</div>
-  <div class="box" style="text-align:center">
-    <p style="font-size:13px;color:#555;margin-bottom:14px">Ouvrez le formulaire, déclarez vos arrêts (un envoi par arrêt), puis revenez ici pour continuer le Daily Report.</p>
-    <button class="b1" style="width:100%" onclick="openStopsForm()">🔗 Ouvrir le Downtime Tracker</button>
+<!-- ============ APPLICATION ============ -->
+<div id="app" style="display:none">
+
+<div class="top">
+  <div class="title">Passation de poste</div>
+  <div class="meta" id="topMeta">Nouveau rapport</div>
+  <div class="belt" id="belt"></div>
+  <div class="stepline"><b id="stepName">Informations</b><span id="stepNum">1 sur 5</span></div>
+</div>
+<div class="draftbar" id="draftbar" style="display:none"></div>
+
+<div class="page">
+
+<!-- 1 · INFORMATIONS -->
+<section class="view on" data-name="Informations">
+  <h2>Le shift</h2>
+  <p class="lead">Ces informations alimentent le rapport et le handover, vous ne les ressaisirez pas.</p>
+
+  <div class="duo">
+    <div class="f"><label for="i_date">Date</label><input type="date" id="i_date"></div>
+    <div class="f"><label for="i_shift">Poste</label>
+      <select id="i_shift"><option value="">Choisir</option>
+        <option>1er (06h-14h)</option><option>2ème (14h-22h)</option><option>3ème (22h-06h)</option>
+      </select></div>
   </div>
-  <div class="g" style="margin-top:6px">
-    <label>Nombre d'arrêts déclarés pendant ce shift</label>
+  <div class="duo">
+    <div class="f"><label for="i_unit">Zone</label><input type="text" id="i_unit" placeholder="Convoyeurs, H3, Port"></div>
+    <div class="f"><label for="i_team">Équipe</label><input type="text" id="i_team" placeholder="A"></div>
+  </div>
+
+  <h3>Superviseurs</h3>
+  <div class="duo">
+    <div class="f"><label for="i_out">Qui termine</label><input type="text" id="i_out" placeholder="Nom et prénom"></div>
+    <div class="f"><label for="i_outfn">Fonction</label><input type="text" id="i_outfn" placeholder="E/I Supervisor"></div>
+  </div>
+  <div class="duo">
+    <div class="f"><label for="i_in">Qui prend le relais</label><input type="text" id="i_in" placeholder="Nom et prénom"></div>
+    <div class="f"><label for="i_inmail">Son email</label><input type="email" id="i_inmail" placeholder="nom@ocpgroup.ma"></div>
+  </div>
+
+  <h3>Effectif</h3>
+  <div class="duo">
+    <div class="f"><label for="i_wf">Personnes présentes</label><input type="number" id="i_wf" min="0" placeholder="0"></div>
+    <div class="f"><label for="i_hrs">Heures travaillées</label><input type="number" id="i_hrs" min="0" step="0.5" placeholder="8"></div>
+  </div>
+</section>
+
+<!-- 2 · ARRÊTS -->
+<section class="view" data-name="Arrêts">
+  <h2>Les arrêts</h2>
+  <p class="lead">La déclaration se fait dans le Downtime Tracker. Les réponses partent directement dans le fichier de suivi sur SharePoint.</p>
+
+  <div class="panel panel-fill">
+    <p style="font-size:13.5px;color:var(--slate);margin-bottom:14px">
+      Ouvrez le formulaire, déclarez chaque arrêt séparément, puis revenez ici.</p>
+    <button class="k-main k-wide" onclick="openTracker()">Ouvrir le Downtime Tracker</button>
+  </div>
+
+  <div class="f" style="margin-top:20px">
+    <label for="i_nbstops">Combien d'arrêts avez-vous déclarés ?</label>
     <input type="number" id="i_nbstops" min="0" placeholder="0">
+    <p class="hint">Ce chiffre sert de repère dans le rapport. Le détail reste dans le fichier de suivi.</p>
   </div>
-  <div class="warn">Ce nombre sert uniquement de repère dans le Daily Report. Le détail des arrêts reste dans le fichier Excel SharePoint.</div>
-</div>
+</section>
 
-<!-- 3 TRAVAUX -->
-<div class="sec" data-name="Travaux">
-  <h2>🔧 Travaux</h2>
-  <div class="tabs">
-    <button id="tb_p" class="act" onclick="openWork('p')">Planifiés<br>(N° WO)</button>
-    <button id="tb_u" onclick="openWork('u')">Non planifiés<br>(N° DI)</button>
-    <button id="tb_n" onclick="openWork('n')">Lendemain<br>(N° I/OT)</button>
-  </div>
-  <div id="workList"></div>
-  <div id="workForm" style="display:none"><div class="box">
-    <h3 id="wfTitle"></h3>
-    <div class="r2">
-      <div class="g"><label id="wfNumLbl">N° WO</label><input type="text" id="w_num"></div>
-      <div class="g"><label>Type</label><input type="text" id="w_type" placeholder="MEC / ELEC / …"></div>
-    </div>
-    <div class="g"><label>TAG Equipment</label><input type="text" id="w_tag"></div>
-    <div class="g"><label id="wfDescLbl">Description</label><textarea id="w_desc"></textarea></div>
-    <div id="fld_p" style="display:none">
-      <div class="g"><label>Executed (Yes/No) ?</label><select id="w_exec"><option value="">—</option><option>Yes</option><option>No</option></select></div>
-      <div class="g"><label>Causes of non-execution</label><textarea id="w_cause"></textarea></div>
-    </div>
-    <div id="fld_u" style="display:none">
-      <div class="g"><label>Emergency (Y/N) ?</label><select id="w_emg"><option value="">—</option><option>Yes</option><option>No</option></select></div>
-      <div class="g"><label>Comments</label><textarea id="w_com"></textarea></div>
-    </div>
-    <div id="fld_n" style="display:none">
-      <div class="g"><label>Planned (Yes/No) ?</label><select id="w_plan"><option value="">—</option><option>Yes</option><option>No</option></select></div>
-    </div>
-    <h3>👷 Resource allocation</h3>
-    <div class="r2"><div class="g"><label>Mechanic — nombre</label><input type="number" id="w_mec_n" min="0"></div>
-      <div class="g"><label>Mechanic — temps réel (h)</label><input type="number" id="w_mec_t" min="0" step="0.5" oninput="calcReal()"></div></div>
-    <div class="r2"><div class="g"><label>Boilermaker — nombre</label><input type="number" id="w_boi_n" min="0"></div>
-      <div class="g"><label>Boilermaker — temps réel (h)</label><input type="number" id="w_boi_t" min="0" step="0.5" oninput="calcReal()"></div></div>
-    <div class="r2"><div class="g"><label>Welder — nombre</label><input type="number" id="w_wel_n" min="0"></div>
-      <div class="g"><label>Welder — temps réel (h)</label><input type="number" id="w_wel_t" min="0" step="0.5" oninput="calcReal()"></div></div>
-    <div class="r2"><div class="g"><label>Electrician — nombre</label><input type="number" id="w_ele_n" min="0"></div>
-      <div class="g"><label>Electrician — temps réel (h)</label><input type="number" id="w_ele_t" min="0" step="0.5" oninput="calcReal()"></div></div>
-    <div class="r2"><div class="g"><label>Instrumentalist — nombre</label><input type="number" id="w_ins_n" min="0"></div>
-      <div class="g"><label>Instrumentalist — temps réel (h)</label><input type="number" id="w_ins_t" min="0" step="0.5" oninput="calcReal()"></div></div>
-    <div class="r2"><div class="g"><label>Other — nombre</label><input type="number" id="w_oth_n" min="0"></div>
-      <div class="g"><label>Other — temps réel (h)</label><input type="number" id="w_oth_t" min="0" step="0.5" oninput="calcReal()"></div></div>
-    <h3>⏱️ Intervention time</h3>
-    <div class="r2">
-      <div class="g"><label>Estimated total (h)</label><input type="number" id="w_est" min="0" step="0.5"></div>
-      <div class="g"><label>Real total (h) — auto</label><input type="number" id="w_real" readonly style="background:#eceff4"></div>
-    </div>
-    <div style="display:flex;gap:8px;margin-top:10px">
-      <button class="b2 sm" onclick="closeWork()">Annuler</button>
-      <button class="b1 sm" onclick="saveWork()">✅ Enregistrer</button>
-    </div>
-  </div></div>
-</div>
+<!-- 3 · TRAVAUX -->
+<section class="view" data-name="Travaux">
+  <h2>Les travaux</h2>
+  <p class="lead">Ajoutez autant d'interventions que nécessaire, avec les moyens engagés.</p>
 
-<!-- 4 HANDOVER -->
-<div class="sec" data-name="Handover">
-  <h2>✋ Handover</h2>
-  <div class="note">Date, shift, équipe et superviseurs sont repris automatiquement de l'étape 1.</div>
-  <div class="g"><label>Completed Actions</label><textarea id="h_done" placeholder="Une action par ligne"></textarea></div>
-  <div class="g"><label>Actions to Complete</label><textarea id="h_todo" placeholder="Une action par ligne"></textarea></div>
-
-  <div class="sigslot">
-    <label>✍️ Signature — Superviseur SORTANT</label>
-    <div class="sigprev" id="prev_out"><div class="ph">Aucune signature</div></div>
-    <button class="b1" style="width:100%" onclick="openPad('out')">✍️ Signer en plein écran</button>
+  <div class="pick">
+    <button id="tab_p" class="sel" onclick="pickKind('p')">Planifiés<br>N° WO</button>
+    <button id="tab_u" onclick="pickKind('u')">Non planifiés<br>N° DI</button>
+    <button id="tab_n" onclick="pickKind('n')">Demain<br>N° I/OT</button>
   </div>
 
-  <div class="sigslot">
-    <label>✍️ Signature — Superviseur ENTRANT</label>
-    <div class="sigprev" id="prev_in"><div class="ph">Aucune signature</div></div>
-    <button class="b1" style="width:100%" onclick="openPad('in')">✍️ Signer en plein écran</button>
+  <div id="list"></div>
+
+  <div id="entry" style="display:none">
+    <div class="panel" style="margin-top:16px">
+      <h3 id="entryTitle" style="margin-top:0">Intervention</h3>
+      <div class="duo">
+        <div class="f"><label id="lblNum">N° WO</label><input type="text" id="w_num"></div>
+        <div class="f"><label>Nature</label><input type="text" id="w_type" placeholder="MEC, ELEC, INST"></div>
+      </div>
+      <div class="f"><label for="w_tag">TAG équipement</label>
+        <input type="text" id="w_tag" list="eqpt" placeholder="Tapez CNVD32, gratteur…" autocomplete="off">
+        <datalist id="eqpt"></datalist>
+        <p class="hint" id="eqptHint">Liste chargée depuis le modèle de l'entreprise.</p></div>
+      <div class="f"><label id="lblDesc">Description</label><textarea id="w_desc"></textarea></div>
+
+      <div id="only_p" style="display:none">
+        <div class="f"><label>Réalisé ?</label>
+          <select id="w_exec"><option value="">Choisir</option><option>Yes</option><option>No</option></select></div>
+        <div class="f"><label>Si non, pourquoi</label><textarea id="w_cause"></textarea></div>
+      </div>
+      <div id="only_u" style="display:none">
+        <div class="f"><label>Urgence ?</label>
+          <select id="w_emg"><option value="">Choisir</option><option>Yes</option><option>No</option></select></div>
+        <div class="f"><label>Commentaires</label><textarea id="w_com"></textarea></div>
+      </div>
+      <div id="only_n" style="display:none">
+        <div class="f"><label>Planifié ?</label>
+          <select id="w_plan"><option value="">Choisir</option><option>Yes</option><option>No</option></select></div>
+      </div>
+
+      <h3>Moyens engagés</h3>
+      <div class="duo"><div class="f"><label>Mécaniciens</label><input type="number" id="w_mec_n" min="0" placeholder="0"></div>
+        <div class="f"><label>Heures réelles</label><input type="number" id="w_mec_t" min="0" step="0.5" placeholder="0" oninput="sumReal()"></div></div>
+      <div class="duo"><div class="f"><label>Chaudronniers</label><input type="number" id="w_boi_n" min="0" placeholder="0"></div>
+        <div class="f"><label>Heures réelles</label><input type="number" id="w_boi_t" min="0" step="0.5" placeholder="0" oninput="sumReal()"></div></div>
+      <div class="duo"><div class="f"><label>Soudeurs</label><input type="number" id="w_wel_n" min="0" placeholder="0"></div>
+        <div class="f"><label>Heures réelles</label><input type="number" id="w_wel_t" min="0" step="0.5" placeholder="0" oninput="sumReal()"></div></div>
+      <div class="duo"><div class="f"><label>Électriciens</label><input type="number" id="w_ele_n" min="0" placeholder="0"></div>
+        <div class="f"><label>Heures réelles</label><input type="number" id="w_ele_t" min="0" step="0.5" placeholder="0" oninput="sumReal()"></div></div>
+      <div class="duo"><div class="f"><label>Instrumentistes</label><input type="number" id="w_ins_n" min="0" placeholder="0"></div>
+        <div class="f"><label>Heures réelles</label><input type="number" id="w_ins_t" min="0" step="0.5" placeholder="0" oninput="sumReal()"></div></div>
+      <div class="duo"><div class="f"><label>Autres</label><input type="number" id="w_oth_n" min="0" placeholder="0"></div>
+        <div class="f"><label>Heures réelles</label><input type="number" id="w_oth_t" min="0" step="0.5" placeholder="0" oninput="sumReal()"></div></div>
+
+      <h3>Durée de l'intervention</h3>
+      <div class="duo">
+        <div class="f"><label>Estimée (h)</label><input type="number" id="w_est" min="0" step="0.5" placeholder="0"></div>
+        <div class="f"><label>Réelle, calculée (h)</label><input type="number" id="w_real" readonly placeholder="0"></div>
+      </div>
+
+      <div class="stack" style="margin-top:8px">
+        <button class="k-main k-wide" onclick="addWork()">Ajouter l'intervention</button>
+        <button class="k-flat k-wide k-sm" onclick="hideEntry()">Annuler</button>
+      </div>
+    </div>
   </div>
 
-  <div class="note">Les deux superviseurs signent sur ce même téléphone, l'un après l'autre, au moment de la passation.</div>
-</div>
+  <button class="k-flat k-wide" id="btnAdd" style="margin-top:16px" onclick="showEntry()">Ajouter une intervention</button>
+</section>
 
-<!-- 5 EXPORT -->
-<div class="sec" data-name="Export">
-  <h2>📤 Téléchargements & envoi</h2>
-  <div class="sum" id="sum"></div>
-  <h3>Fichiers du superviseur sortant</h3>
-  <div class="dl">
-    <button class="b3" onclick="dlDaily()">📊 Daily Report (.xlsx)</button>
+<!-- 4 · HANDOVER -->
+<section class="view" data-name="Handover">
+  <h2>La passation</h2>
+  <p class="lead">Les deux superviseurs signent ici, l'un après l'autre, sur ce téléphone.</p>
+
+  <div class="f"><label for="h_done">Ce qui a été fait</label>
+    <textarea id="h_done" placeholder="Une action par ligne"></textarea></div>
+  <div class="f"><label for="h_todo">Ce qui reste à faire</label>
+    <textarea id="h_todo" placeholder="Une action par ligne"></textarea></div>
+
+  <h3>Signatures</h3>
+  <div class="sign" id="box_out">
+    <div class="who"><span id="nm_out">Superviseur sortant</span><span class="state" id="st_out">À signer</span></div>
+    <div class="plate" id="pl_out"><span class="none">Rien de signé</span></div>
+    <button class="k-main k-wide k-sm" onclick="openPad('out')">Signer</button>
   </div>
+  <div class="sign" id="box_in">
+    <div class="who"><span id="nm_in">Superviseur entrant</span><span class="state" id="st_in">À signer</span></div>
+    <div class="plate" id="pl_in"><span class="none">Rien de signé</span></div>
+    <button class="k-main k-wide k-sm" onclick="openPad('in')">Signer</button>
+  </div>
+</section>
 
-  <h3>Handover signé</h3>
-  <div class="warn" id="hoLockMsg">Les deux superviseurs doivent avoir signé à l'étape 4.</div>
-  <div class="g">
-    <label>Destinataires du handover</label>
+<!-- 5 · CLÔTURE -->
+<section class="view" data-name="Clôture">
+  <h2>Clôture</h2>
+  <p class="lead">Vérifiez, envoyez, récupérez vos fichiers.</p>
+
+  <div class="recap" id="recap"></div>
+
+  <h3>Rapport d'activité</h3>
+  <div class="stack"><button class="k-go k-wide" id="btnDR" onclick="dlDaily()">Remplir le rapport standard (.xlsx)</button></div>
+  <p class="hint" id="drHint">Vos données sont insérées dans le modèle JESA, sans rien modifier de sa mise en forme.</p>
+
+  <h3>Handover</h3>
+  <div class="tell tell-wait" id="hoTell">Les deux signatures manquent encore, revenez à l'étape précédente.</div>
+  <div class="f"><label for="i_mailto">Destinataires</label>
     <input type="email" id="i_mailto" placeholder="chef@ocpgroup.ma ; superviseur@ocpgroup.ma">
+    <p class="hint">Séparez les adresses par un point-virgule.</p></div>
+  <div class="stack">
+    <button class="k-off k-wide" id="btnMail" onclick="shareHandover()" disabled>Envoyer le handover par mail</button>
+    <button class="k-off k-wide" id="btnHo" onclick="dlHandover()" disabled>Télécharger le handover (.doc)</button>
   </div>
-  <div class="dl">
-    <button class="b1" id="btnMail" onclick="shareHandover()" disabled>1️⃣ ✉️ Partager le handover par mail</button>
-    <button class="b2" id="btnHo" onclick="dlHandover()" disabled>2️⃣ 🔒 Télécharger le handover (.doc)</button>
+
+  <h3>Fin de poste</h3>
+  <div class="stack">
+    <button class="k-flat k-wide k-sm" onclick="closeReport()">Clôturer et vider ce téléphone</button>
   </div>
-</div>
+  <p class="hint" style="margin-top:8px">À faire une fois vos fichiers récupérés, pour que le superviseur suivant reparte d'une page vierge.</p>
+</section>
 
 <div class="nav">
-  <button class="b2" id="prev" onclick="go(-1)" disabled>← Précédent</button>
-  <button class="b1" id="next" onclick="go(1)">Suivant →</button>
+  <button class="k-flat" id="back" onclick="move(-1)" disabled>Retour</button>
+  <button class="k-main" id="fwd" onclick="move(1)">Continuer</button>
 </div>
-</div></div>
 
-<!-- ============ OVERLAY SIGNATURE ============ -->
-<div id="padOverlay">
-  <div class="padTop">
-    <div><b id="padWho">Signature</b><small>Signez avec le doigt — la page ne bouge pas</small></div>
-    <button class="b2 sm" onclick="closePad()">✕</button>
+</div></div>
+</div>
+
+<!-- pad signature -->
+<div id="pad">
+  <div class="pad-hd">
+    <div><b id="padWho">Signature</b><small>Signez avec le doigt, la page ne bouge pas</small></div>
+    <button onclick="closePad()">Fermer</button>
   </div>
-  <div class="rotate">💡 Tournez le téléphone à l'horizontale pour plus de place</div>
-  <div class="padStage">
-    <div class="padCanvasWrap">
-      <canvas id="padCanvas"></canvas>
-      <div class="padGuide"></div>
-    </div>
-  </div>
-  <div class="padBottom">
-    <button class="b2" onclick="padClear()">🗑️ Effacer</button>
-    <button class="b3" onclick="padValidate()">✅ Valider</button>
+  <div class="pad-area"><canvas id="padc"></canvas><div class="rule"></div></div>
+  <div class="pad-ft">
+    <button class="cl" onclick="padClear()">Effacer</button>
+    <button class="ok" onclick="padOk()">Valider la signature</button>
   </div>
 </div>
 
 <script>
-let step=1, works={p:[],u:[],n:[]}, curW='p';
+/* ================= ÉTAT ================= */
+const $=i=>document.getElementById(i);
+const v=i=>($(i)?$(i).value:'')||'';
+const KEY='passation_v2';
+const MAXAGE=14*3600*1000;      // un brouillon expire après 14 h
+const FIELDS=['i_date','i_shift','i_unit','i_team','i_out','i_outfn','i_in','i_inmail',
+              'i_wf','i_hrs','i_nbstops','i_mailto','h_done','h_todo'];
+const TRACKER='https://forms.cloud.microsoft/Pages/ResponsePage.aspx?id=-lDbqIcnLEai1_2Kd7eHFNmk0Pq6ssRDpPEaHahEKKNUMkxBUkRPMzBMMjJXWE1KTkw1TEpXTEI4Mi4u';
+
+let step=1, works={p:[],u:[],n:[]}, kind='p', mailSent=false;
 const SIG={out:'',in:''};
-const $=id=>document.getElementById(id);
-const v=id=>($(id)?$(id).value:'')||'';
+const VIEWS=()=>document.querySelectorAll('#app .view');
 
-/* ================= PAD PLEIN ECRAN ================= */
-let padTarget=null, padCtx=null, padHasInk=false, padScrollY=0;
-
-function openPad(which){
-  padTarget=which;
-  $('padWho').textContent = which==='out' ? 'Signature — superviseur sortant' : 'Signature — superviseur entrant';
-  padScrollY=window.scrollY;
-  document.body.classList.add('noscroll');
-  document.body.style.top=(-padScrollY)+'px';
-  $('padOverlay').classList.add('on');
-  setTimeout(padSetup,60);
+/* ================= ACCUEIL ================= */
+function readDraft(){
+  let d; try{d=JSON.parse(localStorage.getItem(KEY))}catch(e){return null}
+  if(!d) return null;
+  if(Date.now()-(d.ts||0)>MAXAGE){localStorage.removeItem(KEY);return null}
+  return d;
 }
-function closePad(){
-  $('padOverlay').classList.remove('on');
-  document.body.classList.remove('noscroll');
-  document.body.style.top='';
-  window.scrollTo(0,padScrollY);
+function gate(){
+  const d=readDraft();
+  if(!d){$('resumeCard').innerHTML='';return}
+  const who=(d.f&&d.f.i_out)||'Superviseur non renseigné';
+  const when=(d.f&&d.f.i_date)||'date non renseignée';
+  const sh=(d.f&&d.f.i_shift)||'';
+  $('resumeCard').innerHTML=`<div class="resume">
+    <div class="lbl">Un rapport est resté en cours sur ce téléphone</div>
+    <div class="nm">${esc(who)}</div>
+    <div class="dt">${esc(when)}${sh?' — '+esc(sh):''} · dernière saisie ${new Date(d.ts).toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'})}</div>
+    <button class="k-main k-wide k-sm" onclick="resumeDraft()">Reprendre ce rapport</button>
+  </div>`;
 }
-function padSetup(){
-  const c=$('padCanvas');
-  const r=c.getBoundingClientRect();
-  const dpr=window.devicePixelRatio||1;
-  c.width=Math.round(r.width*dpr); c.height=Math.round(r.height*dpr);
-  padCtx=c.getContext('2d');
-  padCtx.setTransform(dpr,0,0,dpr,0,0);
-  padCtx.lineWidth=3; padCtx.lineCap='round'; padCtx.lineJoin='round'; padCtx.strokeStyle='#12233a';
-  padHasInk=false;
-  // restaurer une signature déjà faite
-  const prev=SIG[padTarget];
-  if(prev){const img=new Image();img.onload=()=>{padCtx.drawImage(img,0,0,r.width,r.height);padHasInk=true};img.src=prev}
-  if(c.dataset.bound) return; c.dataset.bound='1';
-
-  let drawing=false, pts=[];
-  const pos=e=>{const b=c.getBoundingClientRect();return{x:e.clientX-b.left,y:e.clientY-b.top}};
-
-  c.addEventListener('pointerdown',e=>{
-    e.preventDefault(); c.setPointerCapture(e.pointerId);
-    drawing=true; padHasInk=true; const p=pos(e); pts=[p];
-    padCtx.beginPath(); padCtx.moveTo(p.x,p.y); padCtx.lineTo(p.x+0.01,p.y+0.01); padCtx.stroke();
-  },{passive:false});
-
-  c.addEventListener('pointermove',e=>{
-    if(!drawing) return; e.preventDefault();
-    const evs=e.getCoalescedEvents?e.getCoalescedEvents():[e];
-    for(const ev of evs){
-      pts.push(pos(ev));
-      const n=pts.length; if(n<3) continue;
-      const a=pts[n-3],b=pts[n-2],d=pts[n-1];
-      padCtx.beginPath();
-      padCtx.moveTo((a.x+b.x)/2,(a.y+b.y)/2);
-      padCtx.quadraticCurveTo(b.x,b.y,(b.x+d.x)/2,(b.y+d.y)/2);
-      padCtx.stroke();
-    }
-  },{passive:false});
-
-  const end=e=>{
-    if(!drawing) return; drawing=false;
-    try{c.releasePointerCapture(e.pointerId)}catch(_){}
-    if(pts.length>=2){const a=pts[pts.length-2],b=pts[pts.length-1];
-      padCtx.beginPath();padCtx.moveTo((a.x+b.x)/2,(a.y+b.y)/2);padCtx.lineTo(b.x,b.y);padCtx.stroke()}
-    pts=[];
-  };
-  c.addEventListener('pointerup',end); c.addEventListener('pointercancel',end);
-  c.addEventListener('pointerleave',e=>{if(drawing)end(e)});
+function esc(t){return String(t).replace(/[<>&"]/g,c=>({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'}[c]))}
+function startFresh(){
+  const d=readDraft();
+  if(d && !confirm("Le rapport de "+((d.f&&d.f.i_out)||'un autre superviseur')+" sera effacé.\n\nContinuer ?")) return;
+  localStorage.removeItem(KEY);
+  works={p:[],u:[],n:[]}; SIG.out=''; SIG.in=''; mailSent=false;
+  FIELDS.forEach(id=>{if($(id))$(id).value=''});
+  const t=new Date(); $('i_date').value=t.toISOString().slice(0,10);
+  paintSigs(); drawList(); enterApp(); go(1);
 }
-window.addEventListener('orientationchange',()=>{if($('padOverlay').classList.contains('on'))setTimeout(padSetup,300)});
-function padClear(){const c=$('padCanvas');padCtx.save();padCtx.setTransform(1,0,0,1,0,0);padCtx.clearRect(0,0,c.width,c.height);padCtx.restore();padHasInk=false}
-function padValidate(){
-  if(!padHasInk){alert('Aucune signature tracée.');return}
-  SIG[padTarget]=trimSig($('padCanvas'));
-  const slot=$(padTarget==='out'?'prev_out':'prev_in');
-  slot.innerHTML=`<img src="${SIG[padTarget]}">`;
-  closePad();
-  lockHandover();
+function resumeDraft(){
+  const d=readDraft(); if(!d){gate();return}
+  FIELDS.forEach(id=>{if($(id)&&d.f&&d.f[id]!==undefined)$(id).value=d.f[id]});
+  works=d.works||{p:[],u:[],n:[]};
+  SIG.out=d.sig||''; SIG.in=d.sigIn||''; mailSent=!!d.mailSent;
+  paintSigs(); drawList(); enterApp(); go(d.step||1); stamp();
 }
-/* recadre la signature sur son encre */
-function trimSig(c){
-  const x=c.getContext('2d'), w=c.width, h=c.height;
-  const d=x.getImageData(0,0,w,h).data;
-  let x0=w,y0=h,x1=0,y1=0,found=false;
-  for(let y=0;y<h;y++)for(let px=0;px<w;px++){
-    if(d[(y*w+px)*4+3]>10){found=true;if(px<x0)x0=px;if(px>x1)x1=px;if(y<y0)y0=y;if(y>y1)y1=y}
-  }
-  if(!found) return c.toDataURL('image/png');
-  const pad=12;
-  x0=Math.max(0,x0-pad);y0=Math.max(0,y0-pad);x1=Math.min(w,x1+pad);y1=Math.min(h,y1+pad);
-  const o=document.createElement('canvas'); o.width=x1-x0; o.height=y1-y0;
-  o.getContext('2d').drawImage(c,x0,y0,o.width,o.height,0,0,o.width,o.height);
-  return o.toDataURL('image/png');
+function enterApp(){$('gate').style.display='none';$('app').style.display='block';buildBelt()}
+function closeReport(){
+  if(!confirm('Vider ce téléphone et revenir à l\'accueil ?\n\nAssurez-vous d\'avoir téléchargé vos fichiers.')) return;
+  localStorage.removeItem(KEY); location.reload();
 }
 
 /* ================= NAVIGATION ================= */
-function show(n){
-  const secs=document.querySelectorAll('#appSortant .sec');
-  n=Math.max(1,Math.min(secs.length,n)); step=n;
-  secs.forEach((s,i)=>s.classList.toggle('on',i===n-1));
-  $('stepNum').textContent=n; $('stepName').textContent=secs[n-1].dataset.name;
-  $('fill').style.width=(n/secs.length*100)+'%';
-  $('prev').disabled=n===1;
-  $('next').style.display=n===secs.length?'none':'block';
-  if(n===5){sum();lockHandover()}
+function buildBelt(){
+  $('belt').innerHTML=[...VIEWS()].map(()=>'<i></i>').join('');
+}
+function go(n){
+  const vs=VIEWS(); n=Math.max(1,Math.min(vs.length,n)); step=n;
+  vs.forEach((s,i)=>s.classList.toggle('on',i===n-1));
+  $('belt').querySelectorAll('i').forEach((b,i)=>{
+    b.className=i<n-1?'done':(i===n-1?'now':'')});
+  $('stepName').textContent=vs[n-1].dataset.name;
+  $('stepNum').textContent=n+' sur '+vs.length;
+  $('back').disabled=n===1;
+  $('fwd').style.display=n<vs.length?'block':'none';
+  topMeta();
+  if(n===3) loadEqpt();
+  if(n===4) paintSigs();
+  if(n===5){drawRecap();gateHandover()}
   window.scrollTo(0,0);
 }
-function go(d){show(step+d)}
+function move(d){go(step+d)}
+function topMeta(){
+  const p=[v('i_date'),v('i_shift'),v('i_unit')].filter(Boolean);
+  const who=v('i_out');
+  $('topMeta').innerHTML = p.length||who
+    ? (who?'<b>'+esc(who)+'</b>':'')+(p.length?(who?' — ':'')+esc(p.join(' · ')):'')
+    : 'Nouveau rapport';
+}
 
-/* ================= ARRETS (Microsoft Forms) ================= */
-const STOPS_FORM_URL='https://forms.cloud.microsoft/Pages/ResponsePage.aspx?id=-lDbqIcnLEai1_2Kd7eHFNmk0Pq6ssRDpPEaHahEKKNUMkxBUkRPMzBMMjJXWE1KTkw1TEpXTEI4Mi4u';
-function openStopsForm(){window.open(STOPS_FORM_URL,'_blank','noopener')}
+/* ================= ARRÊTS ================= */
+function openTracker(){window.open(TRACKER,'_blank','noopener')}
 
 /* ================= TRAVAUX ================= */
-const WT={p:{t:'📋 Travail planifié',num:'N° WO',desc:'Description'},
-          u:{t:'📋 Travail non planifié',num:'N° DI',desc:'Description & TAG'},
-          n:{t:'📋 Travail planifié lendemain',num:'N° I/OT',desc:'Description & TAG'}};
-function openWork(k){
-  curW=k; ['p','u','n'].forEach(x=>$('tb_'+x).classList.toggle('act',x===k));
-  $('wfTitle').textContent=WT[k].t; $('wfNumLbl').textContent=WT[k].num; $('wfDescLbl').textContent=WT[k].desc;
-  ['p','u','n'].forEach(x=>$('fld_'+x).style.display=(x===k?'block':'none'));
-  $('workForm').style.display='block'; renderWorks();
+const KIND={p:{t:'Intervention planifiée',n:'N° WO',d:'Description'},
+            u:{t:'Intervention non planifiée',n:'N° DI',d:'Description et TAG'},
+            n:{t:'Intervention prévue demain',n:'N° I/OT',d:'Description et TAG'}};
+function pickKind(k){
+  kind=k; ['p','u','n'].forEach(x=>$('tab_'+x).classList.toggle('sel',x===k));
+  drawList();
 }
-function closeWork(){$('workForm').style.display='none'}
-function calcReal(){const t=['mec','boi','wel','ele','ins','oth'].reduce((s,k)=>s+(parseFloat(v('w_'+k+'_t'))||0),0);$('w_real').value=t.toFixed(1)}
-function saveWork(){
+function showEntry(){
+  $('entryTitle').textContent=KIND[kind].t;
+  $('lblNum').textContent=KIND[kind].n;
+  $('lblDesc').textContent=KIND[kind].d;
+  ['p','u','n'].forEach(x=>$('only_'+x).style.display=(x===kind?'block':'none'));
+  $('entry').style.display='block'; $('btnAdd').style.display='none';
+}
+function hideEntry(){$('entry').style.display='none';$('btnAdd').style.display='block'}
+function sumReal(){
+  const t=['mec','boi','wel','ele','ins','oth'].reduce((s,k)=>s+(parseFloat(v('w_'+k+'_t'))||0),0);
+  $('w_real').value=t?t.toFixed(1):'';
+}
+function addWork(){
+  if(!v('w_desc').trim()&&!v('w_num').trim()){alert('Indiquez au moins un numéro ou une description.');return}
   const w={num:v('w_num'),type:v('w_type'),tag:v('w_tag'),desc:v('w_desc'),
-    mec_n:v('w_mec_n'),mec_t:v('w_mec_t'),boi_n:v('w_boi_n'),boi_t:v('w_boi_t'),
-    wel_n:v('w_wel_n'),wel_t:v('w_wel_t'),ele_n:v('w_ele_n'),ele_t:v('w_ele_t'),
-    ins_n:v('w_ins_n'),ins_t:v('w_ins_t'),oth_n:v('w_oth_n'),oth_t:v('w_oth_t'),
     est:v('w_est'),real:v('w_real')};
-  if(curW==='p'){w.exec=v('w_exec');w.cause=v('w_cause')}
-  if(curW==='u'){w.emg=v('w_emg');w.com=v('w_com')}
-  if(curW==='n'){w.plan=v('w_plan')}
-  works[curW].push(w);
-  ['w_num','w_type','w_tag','w_desc','w_exec','w_cause','w_emg','w_com','w_plan','w_est','w_real',
-   'w_mec_n','w_mec_t','w_boi_n','w_boi_t','w_wel_n','w_wel_t','w_ele_n','w_ele_t','w_ins_n','w_ins_t','w_oth_n','w_oth_t']
-   .forEach(i=>{if($(i))$(i).value=''});
-  renderWorks();
+  ['mec','boi','wel','ele','ins','oth'].forEach(k=>{w[k+'_n']=v('w_'+k+'_n');w[k+'_t']=v('w_'+k+'_t')});
+  if(kind==='p'){w.exec=v('w_exec');w.cause=v('w_cause')}
+  if(kind==='u'){w.emg=v('w_emg');w.com=v('w_com')}
+  if(kind==='n'){w.plan=v('w_plan')}
+  works[kind].push(w);
+  ['w_num','w_type','w_tag','w_desc','w_exec','w_cause','w_emg','w_com','w_plan','w_est','w_real']
+    .forEach(i=>{if($(i))$(i).value=''});
+  ['mec','boi','wel','ele','ins','oth'].forEach(k=>{$('w_'+k+'_n').value='';$('w_'+k+'_t').value=''});
+  drawList(); hideEntry(); save();
 }
-function renderWorks(){
-  const cls={p:'',u:'np',n:'nd'}; let h='';
-  ['p','u','n'].forEach(k=>{
-    if(!works[k].length)return;
-    h+=`<h3>${WT[k].t} (${works[k].length})</h3>`+works[k].map((w,i)=>
-      `<div class="card ${cls[k]}"><div><b>${w.num||'—'} · ${w.tag||'—'}</b>
-       <span>${(w.desc||'').slice(0,48)} · réel ${w.real||0} h</span></div>
-       <button class="b4 sm" onclick="delWork('${k}',${i})">🗑️</button></div>`).join('');
-  });
-  $('workList').innerHTML=h||'<div class="empty">Aucun travail saisi</div>';
+function drawList(){
+  const arr=works[kind];
+  $('list').innerHTML = arr.length
+    ? '<div class="panel">'+arr.map((w,i)=>`<div class="item">
+        <div class="body">
+          <div class="ref">${esc(w.num||'sans numéro')}${w.tag?' · '+esc(w.tag):''}</div>
+          <div class="sub">${esc(w.desc||'—')}</div>
+          <div class="hrs">${w.real||0} h réelles${w.est?' · '+w.est+' h estimées':''}</div>
+        </div>
+        <button class="k-del" onclick="dropWork(${i})">Retirer</button>
+      </div>`).join('')+'</div>'
+    : '<p class="blank">Aucune intervention de ce type</p>';
 }
-function delWork(k,i){works[k].splice(i,1);renderWorks()}
+function dropWork(i){works[kind].splice(i,1);drawList();save()}
 
-/* ================= RESUME ================= */
-function sum(){
-  const nb=works.p.length+works.u.length+works.n.length;
-  const th=[...works.p,...works.u,...works.n].reduce((s,w)=>s+(parseFloat(w.real)||0),0);
-  const wf=parseFloat(v('i_wf'))||0,hr=parseFloat(v('i_hrs'))||0;
-  const taux=(wf*hr)?((th/(wf*hr))*100).toFixed(1)+' %':'—';
-  $('sum').innerHTML=`
-   <div><b>Date</b><span>${v('i_date')||'—'}</span></div>
-   <div><b>Shift</b><span>${v('i_shift')||'—'}</span></div>
-   <div><b>Sortant</b><span>${v('i_out')||'—'}</span></div>
-   <div><b>Entrant</b><span>${v('i_in')||'—'}</span></div>
-   <div><b>Effectif × heures</b><span>${wf} × ${hr} h</span></div>
-   <div><b>Arrêts déclarés</b><span>${v('i_nbstops')||'0'}</span></div>
-   <div><b>Travaux</b><span>${nb} (P:${works.p.length} / NP:${works.u.length} / J+1:${works.n.length})</span></div>
-   <div><b>Temps réel total</b><span>${th.toFixed(1)} h</span></div>
-   <div><b>Taux d'occupation</b><span>${taux}</span></div>
-   <div><b>Signature sortant</b><span>${SIG.out?'<span class="sigok">✅ signée</span>':'—'}</span></div>
-   <div><b>Signature entrant</b><span>${SIG.in?'<span class="sigok">✅ signée</span>':'—'}</span></div>`;
+/* ================= SIGNATURES ================= */
+let padTo=null, pc=null, inked=false, keepY=0;
+function openPad(who){
+  padTo=who;
+  const nm = who==='out' ? (v('i_out')||'superviseur sortant') : (v('i_in')||'superviseur entrant');
+  $('padWho').textContent='Signature — '+nm;
+  keepY=window.scrollY; document.body.classList.add('noscroll'); document.body.style.top=(-keepY)+'px';
+  $('pad').classList.add('on'); setTimeout(padSetup,60);
+}
+function closePad(){
+  $('pad').classList.remove('on'); document.body.classList.remove('noscroll');
+  document.body.style.top=''; window.scrollTo(0,keepY);
+}
+function padSetup(){
+  const c=$('padc'), r=c.getBoundingClientRect(), dpr=window.devicePixelRatio||1;
+  c.width=Math.round(r.width*dpr); c.height=Math.round(r.height*dpr);
+  pc=c.getContext('2d'); pc.setTransform(dpr,0,0,dpr,0,0);
+  pc.lineWidth=3; pc.lineCap='round'; pc.lineJoin='round'; pc.strokeStyle='#141B22';
+  inked=false;
+  const prev=SIG[padTo];
+  if(prev){const im=new Image();im.onload=()=>{
+    const s=Math.min(r.width*.8/im.width,r.height*.7/im.height);
+    pc.drawImage(im,(r.width-im.width*s)/2,(r.height-im.height*s)/2-r.height*.05,im.width*s,im.height*s);
+    inked=true};im.src=prev}
+  if(c.dataset.on) return; c.dataset.on='1';
+  let dn=false,pts=[];
+  const at=e=>{const b=c.getBoundingClientRect();return{x:e.clientX-b.left,y:e.clientY-b.top}};
+  c.addEventListener('pointerdown',e=>{e.preventDefault();c.setPointerCapture(e.pointerId);
+    dn=true;inked=true;const p=at(e);pts=[p];
+    pc.beginPath();pc.moveTo(p.x,p.y);pc.lineTo(p.x+.01,p.y+.01);pc.stroke()},{passive:false});
+  c.addEventListener('pointermove',e=>{if(!dn)return;e.preventDefault();
+    const evs=e.getCoalescedEvents?e.getCoalescedEvents():[e];
+    for(const ev of evs){pts.push(at(ev));const n=pts.length;if(n<3)continue;
+      const a=pts[n-3],b=pts[n-2],d=pts[n-1];
+      pc.beginPath();pc.moveTo((a.x+b.x)/2,(a.y+b.y)/2);
+      pc.quadraticCurveTo(b.x,b.y,(b.x+d.x)/2,(b.y+d.y)/2);pc.stroke()}},{passive:false});
+  const up=e=>{if(!dn)return;dn=false;try{c.releasePointerCapture(e.pointerId)}catch(_){}
+    if(pts.length>=2){const a=pts[pts.length-2],b=pts[pts.length-1];
+      pc.beginPath();pc.moveTo((a.x+b.x)/2,(a.y+b.y)/2);pc.lineTo(b.x,b.y);pc.stroke()}pts=[]};
+  c.addEventListener('pointerup',up);c.addEventListener('pointercancel',up);
+  c.addEventListener('pointerleave',e=>{if(dn)up(e)});
+}
+addEventListener('orientationchange',()=>{if($('pad').classList.contains('on'))setTimeout(padSetup,300)});
+function padClear(){const c=$('padc');pc.save();pc.setTransform(1,0,0,1,0,0);pc.clearRect(0,0,c.width,c.height);pc.restore();inked=false}
+function padOk(){
+  if(!inked){alert('Rien n\'a été tracé.');return}
+  SIG[padTo]=crop($('padc')); paintSigs(); closePad(); save(); gateHandover();
+}
+function crop(c){
+  const x=c.getContext('2d'),w=c.width,h=c.height,d=x.getImageData(0,0,w,h).data;
+  let a=w,b=h,e=0,f=0,ok=false;
+  for(let y=0;y<h;y++)for(let p=0;p<w;p++)if(d[(y*w+p)*4+3]>10){
+    ok=true;if(p<a)a=p;if(p>e)e=p;if(y<b)b=y;if(y>f)f=y}
+  if(!ok)return c.toDataURL('image/png');
+  const m=14;a=Math.max(0,a-m);b=Math.max(0,b-m);e=Math.min(w,e+m);f=Math.min(h,f+m);
+  const o=document.createElement('canvas');o.width=e-a;o.height=f-b;
+  o.getContext('2d').drawImage(c,a,b,o.width,o.height,0,0,o.width,o.height);
+  return o.toDataURL('image/png');
+}
+function paintSigs(){
+  [['out','i_out','sortant'],['in','i_in','entrant']].forEach(([k,fld,role])=>{
+    const nm=v(fld); 
+    $('nm_'+k).textContent = nm || ('Superviseur '+role);
+    $('box_'+k).classList.toggle('filled',!!SIG[k]);
+    $('st_'+k).textContent = SIG[k]?'Signé':'À signer';
+    $('pl_'+k).innerHTML = SIG[k]?`<img src="${SIG[k]}" alt="Signature ${role}">`:'<span class="none">Rien de signé</span>';
+  });
+}
+
+/* ================= RÉCAP + VERROU ================= */
+function drawRecap(){
+  const all=[...works.p,...works.u,...works.n];
+  const th=all.reduce((s,w)=>s+(parseFloat(w.real)||0),0);
+  const wf=parseFloat(v('i_wf'))||0, hr=parseFloat(v('i_hrs'))||0;
+  const cap=wf*hr;
+  $('recap').innerHTML=`
+    <div><b>Poste</b><span>${esc(v('i_date')||'—')} · ${esc(v('i_shift')||'—')}</span></div>
+    <div><b>Zone</b><span>${esc(v('i_unit')||'—')}</span></div>
+    <div><b>Sortant</b><span>${esc(v('i_out')||'—')}</span></div>
+    <div><b>Entrant</b><span>${esc(v('i_in')||'—')}</span></div>
+    <div><b>Effectif</b><span>${wf} × ${hr} h</span></div>
+    <div><b>Arrêts déclarés</b><span>${v('i_nbstops')||'0'}</span></div>
+    <div><b>Interventions</b><span>${all.length} · ${works.p.length} planifiées, ${works.u.length} non planifiées, ${works.n.length} demain</span></div>
+    <div><b>Heures réelles</b><span>${th.toFixed(1)} h</span></div>
+    <div><b>Taux d'occupation</b><span>${cap?((th/cap)*100).toFixed(1)+' %':'—'}</span></div>`;
+}
+function gateHandover(){
+  const bm=$('btnMail'), b=$('btnHo'), t=$('hoTell'); if(!b) return;
+  const both=SIG.out&&SIG.in;
+  bm.disabled=!both; bm.className=both?'k-main k-wide':'k-off k-wide';
+  b.disabled=!(both&&mailSent); b.className=(both&&mailSent)?'k-go k-wide':'k-off k-wide';
+  if(!both){t.className='tell tell-wait';
+    t.textContent = SIG.out?'Il manque la signature du superviseur entrant.'
+      : (SIG.in?'Il manque la signature du superviseur sortant.'
+      :'Les deux signatures manquent encore, revenez à l\'étape précédente.');}
+  else if(!mailSent){t.className='tell tell-wait';
+    t.textContent='Les deux signatures sont enregistrées. Envoyez le handover pour débloquer le téléchargement.';}
+  else{t.className='tell tell-ok';t.textContent='Handover envoyé. Vous pouvez télécharger le document.';}
 }
 
 /* ================= EXPORTS ================= */
-const RES=['Mechanic','Real occ. time','Boilermaker','Real occ. time','Welder','Real occ. time',
-           'Electrician','Real occ. time','Instrumentalist','Real occ. time','Other','Real occ. time'];
-function resRow(w){return[w.mec_n,w.mec_t,w.boi_n,w.boi_t,w.wel_n,w.wel_t,w.ele_n,w.ele_t,w.ins_n,w.ins_t,w.oth_n,w.oth_t]}
-function dlDaily(){
-  const wf=parseFloat(v('i_wf'))||0,hr=parseFloat(v('i_hrs'))||0,cap=wf*hr;
-  const occ=l=>l.reduce((s,w)=>s+['mec','boi','wel','ele','ins','oth']
-    .reduce((a,k)=>a+((parseFloat(w[k+'_n'])||0)*(parseFloat(w[k+'_t'])||0)),0),0);
-  const oP=occ(works.p),oU=occ(works.u);
-  const A=[];
-  A.push(['Daily Activity Report and Forecast']);A.push([]);
-  A.push(['Project Title','Solid Sulfur Port Superstructure','','Customer','OCP']);
-  A.push(['Date',v('i_date'),'','Unit',v('i_unit')]);
-  A.push(['Shift',v('i_shift'),'','Équipe',v('i_team')]);
-  A.push(['Superviseur sortant',v('i_out'),'','Superviseur entrant',v('i_in')]);
-  A.push(['Nombre of workforce',wf,'',"Nombre d'heures de travail",hr]);
-  A.push(["Nombre d'arrêts déclarés",v('i_nbstops')||0]);
-  A.push(["Taux d'occupation Planned",cap?oP/cap:0,'',"Taux d'occupation Non Planned",cap?oU/cap:0]);
-  A.push(["Taux d'occupation total",cap?(oP+oU)/cap:0]);A.push([]);
-  const hdr=(n,d,c5,c6)=>['N° '+n,'Type','TAG Equipment',d,c5,c6,...RES,'Estimated total','Real total'];
-  A.push(['PLANNED WORK ORDERS']);
-  A.push(hdr('WO','Description','Executed (Yes/No) ?','Causes of non-execution'));
-  works.p.forEach(w=>A.push([w.num,w.type,w.tag,w.desc,w.exec,w.cause,...resRow(w),w.est,w.real]));
-  A.push([]);A.push(['NON PLANNED WORKS']);
-  A.push(hdr('DI','Description & TAG','Emergency (Y/N) ?','Comments'));
-  works.u.forEach(w=>A.push([w.num,w.type,w.tag,w.desc,w.emg,w.com,...resRow(w),w.est,w.real]));
-  A.push([]);A.push(['WORK PLANNED FOR NEXT DAY AND FORECAST']);
-  A.push(hdr('I/OT','Description & TAG','Planned (Yes/No) ?',''));
-  works.n.forEach(w=>A.push([w.num,w.type,w.tag,w.desc,w.plan,'',...resRow(w),w.est,w.real]));
-  const ws=XLSX.utils.aoa_to_sheet(A);
-  ws['!cols']=[{wch:12},{wch:10},{wch:16},{wch:42},{wch:20},{wch:24}].concat(Array(12).fill({wch:11}),[{wch:14},{wch:12}]);
-  const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,'Daily report');
-  XLSX.writeFile(wb,`DR_${(v('i_date')||'sansdate').replace(/-/g,'_')}_${(v('i_shift')||'').slice(0,4)}.xlsx`);
+const TPL='template.xlsx';   /* modèle JESA déposé à côté de index.html */
+let tplBuf=null, eqptDone=false;
+
+async function getTpl(){
+  if(tplBuf) return tplBuf;
+  const r=await fetch(TPL,{cache:'no-store'});
+  if(!r.ok) throw new Error('modèle introuvable ('+r.status+')');
+  tplBuf=await r.arrayBuffer();
+  return tplBuf;
 }
-function hoHTML(so,si){
-  const li=t=>(t||'').split('\n').filter(x=>x.trim()).map((x,i)=>`<tr><td width="30">${i+1}</td><td>${x}</td></tr>`).join('')||'<tr><td></td><td>—</td></tr>';
-  return `<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word"><head><meta charset="utf-8">
-  <style>body{font-family:Calibri,Arial;font-size:11pt}table{border-collapse:collapse;width:100%;margin-bottom:12px}
-  td,th{border:1px solid #666;padding:5px;font-size:10pt}th{background:#1f4e79;color:#fff}
-  h2{font-size:13pt;color:#1f4e79;margin:14px 0 6px}</style></head><body>
-  <p><b>Function: JESA Asset Management</b><br>Shift Handover Sheet</p>
-  <table><tr><th colspan="4">Project Details</th></tr>
-  <tr><td><b>Project Title</b></td><td>Solid Sulfur Port Superstructure</td><td><b>Customer</b></td><td>OCP-B10</td></tr>
-  <tr><td><b>Unit</b></td><td>${v('i_unit')||'—'}</td><td><b>Date</b></td><td>${v('i_date')||'—'}</td></tr>
-  <tr><td><b>Shift</b></td><td>${v('i_shift')||'—'}</td><td><b>Équipe</b></td><td>${v('i_team')||'—'}</td></tr></table>
+async function loadEqpt(){
+  if(eqptDone) return; eqptDone=true;
+  try{
+    const wb=new ExcelJS.Workbook(); await wb.xlsx.load(await getTpl());
+    const ws=wb.getWorksheet('Eqpt'); if(!ws) return;
+    const out=[];
+    ws.eachRow((row,i)=>{ if(i===1) return;
+      const lib=row.getCell(1).value, tag=row.getCell(2).value;
+      if(tag) out.push('<option value="'+esc(String(tag))+'">'+esc(String(lib||''))+'</option>');
+    });
+    $('eqpt').innerHTML=out.join('');
+    $('eqptHint').textContent=out.length+" équipements disponibles, tapez pour filtrer.";
+  }catch(e){
+    $('eqptHint').textContent="Liste d'équipements indisponible, saisissez le TAG à la main.";
+  }
+}
+
+/* insère des lignes en conservant fusions, hauteurs et styles */
+function growRows(ws, afterRow, count){
+  if(count<=0) return;
+  const merges=[...(ws.model.merges||[])];
+  merges.forEach(m=>{try{ws.unMergeCells(m)}catch(e){}});
+  ws.duplicateRow(afterRow, count, true);
+  const cut=s=>{const r=/^([A-Z]+)(\d+)$/.exec(s);return[r[1],+r[2]]};
+  const mv=r=>r>afterRow?r+count:r;
+  const next=merges.map(m=>{
+    const [a,b]=m.split(':'), [c1,r1]=cut(a), [c2,r2]=cut(b);
+    return c1+mv(r1)+':'+c2+mv(r2);
+  });
+  merges.filter(m=>+/^[A-Z]+(\d+):/.exec(m)[1]===afterRow).forEach(m=>{
+    const [a,b]=m.split(':'), c1=cut(a)[0], c2=cut(b)[0];
+    for(let i=1;i<=count;i++) next.push(c1+(afterRow+i)+':'+c2+(afterRow+i));
+  });
+  [...new Set(next)].forEach(m=>{try{ws.mergeCells(m)}catch(e){}});
+}
+
+const COLS={num:'A',type:'B',tag:'C',desc:'E',flag:'L',note:'N',
+  mec_n:'R',mec_t:'S',boi_n:'T',boi_t:'U',wel_n:'V',wel_t:'W',
+  ele_n:'X',ele_t:'Y',ins_n:'Z',ins_t:'AA',oth_n:'AB',oth_t:'AC',
+  est:'AD',real:'AE'};
+const num=x=>{const n=parseFloat(x);return isNaN(n)?null:n};
+
+function putRow(ws,r,w,flag,note){
+  const put=(c,val)=>{if(val!==null&&val!==undefined&&val!=='')ws.getCell(c+r).value=val};
+  put(COLS.num,w.num); put(COLS.type,w.type); put(COLS.tag,w.tag); put(COLS.desc,w.desc);
+  put(COLS.flag,flag); put(COLS.note,note);
+  ['mec','boi','wel','ele','ins','oth'].forEach(k=>{
+    put(COLS[k+'_n'],num(w[k+'_n'])); put(COLS[k+'_t'],num(w[k+'_t']));
+  });
+  put(COLS.est,num(w.est)); put(COLS.real,num(w.real));
+}
+
+async function dlDaily(){
+  const b=$('btnDR'), lbl=b.textContent;
+  b.disabled=true; b.textContent='Préparation du fichier…';
+  try{
+    const wb=new ExcelJS.Workbook();
+    await wb.xlsx.load(await getTpl());
+    const ws=wb.getWorksheet('F1');
+
+    /* le modèle offre 1 ligne planifiée, 6 non planifiées, 1 pour demain */
+    const xP=Math.max(0,works.p.length-1),
+          xU=Math.max(0,works.u.length-6),
+          xN=Math.max(0,works.n.length-1);
+    growRows(ws,31,xN); growRows(ws,27,xU); growRows(ws,18,xP);
+
+    const rP=18, rU=22+xP, rN=31+xP+xU, shift=xP+xU+xN;
+
+    ws.getCell('P6').value = v('i_date') || '';
+    if(v('i_out')) ws.getCell('G7').value = v('i_out');
+
+    works.p.forEach((w,i)=>putRow(ws,rP+i,w,w.exec,w.cause));
+    works.u.forEach((w,i)=>putRow(ws,rU+i,w,w.emg,w.com));
+    works.n.forEach((w,i)=>putRow(ws,rN+i,w,w.plan,''));
+
+    /* bloc Comments : le contexte du poste, qui n'a pas de case dédiée */
+    const ctx=['Poste '+(v('i_shift')||'—'),
+               v('i_team')?'équipe '+v('i_team'):null,
+               'effectif '+(v('i_wf')||0)+' × '+(v('i_hrs')||0)+' h',
+               (v('i_nbstops')||0)+' arrêt(s) déclaré(s)'].filter(Boolean).join(' — ');
+    ws.getCell('A'+(34+shift)).value='1. '+ctx+'\n2. ';
+    ws.getCell('A'+(40+shift)).value=(v('i_out')||'')+(v('i_date')?' — '+v('i_date'):'');
+
+    const buf=await wb.xlsx.writeBuffer();
+    const url=URL.createObjectURL(new Blob([buf],
+      {type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}));
+    const a=document.createElement('a');
+    a.href=url;
+    a.download='DR_'+(v('i_date')||'sansdate').replace(/-/g,'_')+'_'+(v('i_shift')||'').slice(0,4)+'.xlsx';
+    a.click(); setTimeout(()=>URL.revokeObjectURL(url),4000);
+    $('drHint').textContent='Rapport généré à partir du modèle JESA.';
+  }catch(e){
+    alert("Le rapport n'a pas pu être généré.\n\n"+e.message
+      +"\n\nVérifiez que le fichier template.xlsx est bien déposé à côté de l'application.");
+  }finally{ b.disabled=false; b.textContent=lbl; }
+}
+
+function hoDoc(){
+  const li=t=>(t||'').split('\n').filter(x=>x.trim())
+    .map((x,i)=>`<tr><td width="28">${i+1}</td><td>${esc(x)}</td></tr>`).join('')
+    ||'<tr><td></td><td>—</td></tr>';
+  return `<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word">
+  <head><meta charset="utf-8"><style>
+  body{font-family:Calibri,Arial;font-size:11pt;color:#141B22}
+  table{border-collapse:collapse;width:100%;margin-bottom:12px}
+  td,th{border:1px solid #8A949E;padding:6px;font-size:10pt;vertical-align:top}
+  th{background:#141B22;color:#fff;text-align:left}
+  h2{font-size:12pt;margin:16px 0 6px}
+  </style></head><body>
+  <p><b>JESA — Asset Management</b><br>Fiche de passation de poste</p>
   <table>
-  <tr><td><b>Shift* Supervisor (sortant)</b></td><td>${v('i_out')||'—'}</td><td><b>Function</b></td><td>${v('i_outfn')||'—'}</td></tr>
-  <tr><td><b>Shift** Supervisor (entrant)</b></td><td colspan="3">${v('i_in')||'—'}</td></tr></table>
-  <h2>Completed Actions</h2><table>${li(v('h_done'))}</table>
-  <h2>Actions to Complete</h2><table>${li(v('h_todo'))}</table>
-  <table><tr><th width="50%">Closing Shift Signature</th><th>Starting Shift Signature</th></tr>
-  <tr><td align="center" height="90">${so?`<img src="${so}" width="230">`:'&nbsp;'}<br>${v('i_out')||''}</td>
-      <td align="center" height="90">${si?`<img src="${si}" width="230">`:'&nbsp;'}<br>${v('i_in')||''}</td></tr></table>
+  <tr><th colspan="4">Chantier</th></tr>
+  <tr><td><b>Projet</b></td><td>Solid Sulfur Port Superstructure</td><td><b>Client</b></td><td>OCP — B10</td></tr>
+  <tr><td><b>Zone</b></td><td>${esc(v('i_unit')||'—')}</td><td><b>Date</b></td><td>${esc(v('i_date')||'—')}</td></tr>
+  <tr><td><b>Poste</b></td><td>${esc(v('i_shift')||'—')}</td><td><b>Équipe</b></td><td>${esc(v('i_team')||'—')}</td></tr>
+  </table>
+  <table>
+  <tr><td><b>Superviseur sortant</b></td><td>${esc(v('i_out')||'—')}</td><td><b>Fonction</b></td><td>${esc(v('i_outfn')||'—')}</td></tr>
+  <tr><td><b>Superviseur entrant</b></td><td colspan="3">${esc(v('i_in')||'—')}</td></tr>
+  </table>
+  <h2>Ce qui a été fait</h2><table>${li(v('h_done'))}</table>
+  <h2>Ce qui reste à faire</h2><table>${li(v('h_todo'))}</table>
+  <table><tr><th width="50%">Signature — poste terminé</th><th>Signature — poste pris</th></tr>
+  <tr><td align="center" height="95">${SIG.out?`<img src="${SIG.out}" width="215">`:'&nbsp;'}<br>${esc(v('i_out')||'')}</td>
+      <td align="center" height="95">${SIG.in?`<img src="${SIG.in}" width="215">`:'&nbsp;'}<br>${esc(v('i_in')||'')}</td></tr></table>
   </body></html>`;
 }
-function saveDoc(html,name){const b=new Blob(['\ufeff'+html],{type:'application/msword'});
-  const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download=name;a.click()}
 function dlHandover(){
-  if(!(SIG.out&&SIG.in)){alert('Les deux signatures sont nécessaires (étape 4).');return}
-  if(!mailSent){alert("Partagez d'abord le handover par mail (bouton 1).");return}
-  saveDoc(hoHTML(SIG.out,SIG.in),`HANDOVER_SIGNE_${(v('i_date')||'sansdate').replace(/-/g,'_')}.doc`);
+  if(!(SIG.out&&SIG.in)){alert('Il manque une signature.');return}
+  if(!mailSent){alert('Envoyez d\'abord le handover par mail.');return}
+  const b=new Blob(['\ufeff'+hoDoc()],{type:'application/msword'});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(b);
+  a.download=`HANDOVER_${(v('i_date')||'sansdate').replace(/-/g,'_')}.doc`; a.click();
 }
-let mailSent=false;
 function shareHandover(){
-  if(!(SIG.out&&SIG.in)){alert('Les deux signatures sont nécessaires (étape 4).');return}
-  const dest=(v('i_mailto')||v('i_inmail')||'').replace(/\s*;\s*/g,',');
-  const sujet='Handover '+(v('i_date')||'')+' — '+(v('i_shift')||'')+' — '+(v('i_unit')||'');
-  const done=(v('h_done')||'').split('\n').filter(x=>x.trim()).map(x=>'• '+x).join('\n')||'—';
-  const todo=(v('h_todo')||'').split('\n').filter(x=>x.trim()).map(x=>'• '+x).join('\n')||'—';
-  const corps='Bonjour,\n\nHandover du '+(v('i_date')||'')+' — shift '+(v('i_shift')||'')
-    +'\nUnité : '+(v('i_unit')||'')+'\nSortant : '+(v('i_out')||'')+'\nEntrant : '+(v('i_in')||'')
-    +'\n\nACTIONS RÉALISÉES\n'+done
-    +'\n\nACTIONS À COMPLÉTER\n'+todo
-    +'\n\nLe document signé par les deux superviseurs est joint.\n\nCordialement,\n'+(v('i_out')||'');
-  mailSent=true; saveDraft(); lockHandover();
-  location.href='mailto:'+encodeURIComponent(dest)+'?subject='+encodeURIComponent(sujet)+'&body='+encodeURIComponent(corps);
+  if(!(SIG.out&&SIG.in)){alert('Il manque une signature.');return}
+  const to=(v('i_mailto')||v('i_inmail')||'').replace(/\s*;\s*/g,',');
+  const li=t=>(t||'').split('\n').filter(x=>x.trim()).map(x=>'- '+x).join('\n')||'-';
+  const body='Bonjour,\n\nPassation du '+(v('i_date')||'')+', poste '+(v('i_shift')||'')
+    +'\nZone : '+(v('i_unit')||'')
+    +'\nSortant : '+(v('i_out')||'')+'\nEntrant : '+(v('i_in')||'')
+    +'\n\nCE QUI A ÉTÉ FAIT\n'+li(v('h_done'))
+    +'\n\nCE QUI RESTE À FAIRE\n'+li(v('h_todo'))
+    +'\n\nLa fiche signée par les deux superviseurs est jointe.\n\n'+(v('i_out')||'');
+  mailSent=true; save(); gateHandover();
+  location.href='mailto:'+encodeURIComponent(to)
+    +'?subject='+encodeURIComponent('Passation '+(v('i_date')||'')+' — '+(v('i_shift')||'')+' — '+(v('i_unit')||''))
+    +'&body='+encodeURIComponent(body);
 }
-function lockHandover(){
-  const bm=$('btnMail'), b=$('btnHo'), m=$('hoLockMsg'); if(!b) return;
-  const both=SIG.out&&SIG.in;
-  bm.disabled=!both; bm.className=both?'b1':'b2';
-  if(!both){
-    b.disabled=true; b.className='b2'; b.textContent='2️⃣ 🔒 Télécharger le handover (.doc)';
-    m.className='warn'; m.innerHTML="Les deux superviseurs doivent avoir signé à l'étape 4.";
-    return;
-  }
-  if(!mailSent){
-    b.disabled=true; b.className='b2'; b.textContent='2️⃣ 🔒 Télécharger le handover (.doc)';
-    m.className='note'; m.innerHTML='✅ Les deux signatures sont enregistrées. Partagez le handover par mail (bouton 1) pour débloquer le téléchargement.';
-  }else{
-    b.disabled=false; b.className='b3'; b.textContent='2️⃣ 📋 Télécharger le handover signé (.doc)';
-    m.className='note'; m.innerHTML='✅ Handover partagé. Le téléchargement est débloqué.';
-  }
-}
-/* ================= SAUVEGARDE LOCALE ================= */
-const KEY='shiftreport_draft_v1';
-const FIELDS=['i_date','i_shift','i_unit','i_team','i_out','i_outfn','i_in','i_inmail','i_wf','i_hrs','i_nbstops','i_mailto','h_done','h_todo'];
-let saveTimer=null;
 
-function saveDraft(){
+/* ================= BROUILLON ================= */
+let timer=null;
+function save(){
   try{
     const f={}; FIELDS.forEach(id=>f[id]=v(id));
     localStorage.setItem(KEY,JSON.stringify({f,works,sig:SIG.out,sigIn:SIG.in,mailSent,step,ts:Date.now()}));
-    flagSaved();
+    stamp();
   }catch(e){}
 }
-function saveSoon(){clearTimeout(saveTimer);saveTimer=setTimeout(saveDraft,400)}
-function flagSaved(){
-  const el=$('draftInfo'); if(!el) return;
-  el.innerHTML='💾 Brouillon enregistré à '+new Date().toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'})
-    +' &nbsp;·&nbsp; <a href="#" onclick="clearDraft();return false" style="color:#c62828">Nouveau shift</a>';
+function saveSoon(){clearTimeout(timer);timer=setTimeout(save,400)}
+function stamp(){
+  const b=$('draftbar'); if(!b) return;
+  b.style.display='flex';
+  b.innerHTML='<span>Enregistré à '+new Date().toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'})+'</span>'
+    +'<a href="#" onclick="closeReport();return false">Clôturer</a>';
 }
-function loadDraft(){
-  let d; try{d=JSON.parse(localStorage.getItem(KEY))}catch(e){return false}
-  if(!d) return false;
-  const age=(Date.now()-(d.ts||0))/3600000;
-  const when=new Date(d.ts).toLocaleString('fr-FR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'});
-  if(!confirm(`Un brouillon du ${when} a été trouvé.\n\nOK = reprendre la saisie\nAnnuler = repartir de zéro`)){
-    localStorage.removeItem(KEY); return false;
-  }
-  FIELDS.forEach(id=>{if($(id)&&d.f&&d.f[id]!==undefined)$(id).value=d.f[id]});
-  works=d.works||{p:[],u:[],n:[]};
-  if(d.sig){SIG.out=d.sig; const s=$('prev_out'); if(s)s.innerHTML=`<img src="${d.sig}">`}
-  if(d.sigIn){SIG.in=d.sigIn; const t=$('prev_in'); if(t)t.innerHTML=`<img src="${d.sigIn}">`}
-  mailSent=!!d.mailSent;
-  renderWorks(); show(d.step||1); flagSaved();
-  return true;
-}
-function loadDraftSilent(){
-  let d; try{d=JSON.parse(localStorage.getItem(KEY))}catch(e){return false}
-  if(!d) return false;
-  FIELDS.forEach(id=>{if($(id)&&d.f&&d.f[id]!==undefined)$(id).value=d.f[id]});
-  works=d.works||{p:[],u:[],n:[]};
-  if(d.sig){SIG.out=d.sig; const s=$('prev_out'); if(s)s.innerHTML=`<img src="${d.sig}">`}
-  if(d.sigIn){SIG.in=d.sigIn; const t=$('prev_in'); if(t)t.innerHTML=`<img src="${d.sigIn}">`}
-  mailSent=!!d.mailSent;
-  renderWorks(); flagSaved();
-  return true;
-}
-function clearDraft(){
-  if(!confirm('Effacer le brouillon et recommencer un nouveau shift ?')) return;
-  localStorage.removeItem(KEY); location.reload();
-}
-/* déclencheurs */
-document.addEventListener('input',saveSoon,true);
+document.addEventListener('input',e=>{saveSoon();
+  if(['i_out','i_in','i_date','i_shift','i_unit'].includes(e.target.id)){topMeta();paintSigs()}},true);
 document.addEventListener('change',saveSoon,true);
-window.addEventListener('beforeunload',saveDraft);
-document.addEventListener('visibilitychange',()=>{if(document.hidden)saveDraft()});
-['saveWork','delWork','padValidate'].forEach(fn=>{
-  const orig=window[fn];
-  window[fn]=function(){const r=orig.apply(this,arguments);saveDraft();return r};
-});
+addEventListener('beforeunload',save);
+document.addEventListener('visibilitychange',()=>{if(document.hidden)save()});
 
-/* ================= BOOT ================= */
-(function boot(){
-  renderWorks(); show(1);
-  if(localStorage.getItem(KEY)) loadDraft();
-})();
+/* ================= DÉMARRAGE ================= */
+buildBelt(); gate();
 </script>
 </body>
 </html>
