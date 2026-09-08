@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
 <meta name="theme-color" content="#141B22">
 <title>Passation de poste — Convoyeurs & Stockage</title>
-<script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/fflate@0.8.2/umd/index.js"></script>
 <style>
 :root{
   --ink:#141B22;      /* graphite structure */
@@ -216,6 +216,9 @@ button:focus-visible{outline:3px solid var(--sulfur);outline-offset:2px}
     <div class="f"><label for="i_team">Équipe</label><input type="text" id="i_team" placeholder="A"></div>
   </div>
 
+  <div class="f"><label for="i_manager">Responsable JESA du document</label>
+    <input type="text" id="i_manager" placeholder="Nom du manager"></div>
+
   <h3>Superviseurs</h3>
   <div class="duo">
     <div class="f"><label for="i_out">Qui termine</label><input type="text" id="i_out" placeholder="Nom et prénom"></div>
@@ -274,7 +277,7 @@ button:focus-visible{outline:3px solid var(--sulfur);outline-offset:2px}
       <div class="f"><label for="w_tag">TAG équipement</label>
         <input type="text" id="w_tag" list="eqpt" placeholder="Tapez CNVD32, gratteur…" autocomplete="off">
         <datalist id="eqpt"></datalist>
-        <p class="hint" id="eqptHint">Liste chargée depuis le modèle de l'entreprise.</p></div>
+        <p class="hint" id="eqptHint">Référentiel équipements JESA.</p></div>
       <div class="f"><label id="lblDesc">Description</label><textarea id="w_desc"></textarea></div>
 
       <div id="only_p" style="display:none">
@@ -401,7 +404,7 @@ const v=i=>($(i)?$(i).value:'')||'';
 const KEY='passation_v2';
 const MAXAGE=14*3600*1000;      // un brouillon expire après 14 h
 const FIELDS=['i_date','i_shift','i_unit','i_team','i_out','i_outfn','i_in','i_inmail',
-              'i_wf','i_hrs','i_nbstops','i_mailto','h_done','h_todo'];
+              'i_manager','i_wf','i_hrs','i_nbstops','i_mailto','h_done','h_todo'];
 const TRACKER='https://forms.cloud.microsoft/Pages/ResponsePage.aspx?id=-lDbqIcnLEai1_2Kd7eHFNmk0Pq6ssRDpPEaHahEKKNUMkxBUkRPMzBMMjJXWE1KTkw1TEpXTEI4Mi4u';
 
 let step=1, works={p:[],u:[],n:[]}, kind='p', mailSent=false;
@@ -632,110 +635,122 @@ function gateHandover(){
 }
 
 /* ================= EXPORTS ================= */
-const TPL='template.xlsx';   /* modèle JESA déposé à côté de index.html */
+const TPL='template.xlsx';    /* modèle JESA, déposé à côté de index.html */
+const SHEET_XML='xl/worksheets/sheet1.xml';
+const STEP=3;                  /* une intervention occupe 3 lignes fusionnées */
+const SLOT={p:{start:18,max:12},u:{start:57,max:10},n:{start:90,max:10}};
+const COLS={num:'A',type:'B',tag:'C',desc:'E',flag:'L',note:'N',
+  mec_n:'R',mec_t:'S',boi_n:'T',boi_t:'U',wel_n:'V',wel_t:'W',
+  ele_n:'X',ele_t:'Y',ins_n:'Z',ins_t:'AA',oth_n:'AB',oth_t:'AC',
+  est:'AD',real:'AE'};
 let tplBuf=null, eqptDone=false;
 
 async function getTpl(){
   if(tplBuf) return tplBuf;
   const r=await fetch(TPL,{cache:'no-store'});
   if(!r.ok) throw new Error('modèle introuvable ('+r.status+')');
-  tplBuf=await r.arrayBuffer();
+  tplBuf=new Uint8Array(await r.arrayBuffer());
   return tplBuf;
 }
 async function loadEqpt(){
   if(eqptDone) return; eqptDone=true;
   try{
-    const wb=new ExcelJS.Workbook(); await wb.xlsx.load(await getTpl());
-    const ws=wb.getWorksheet('Eqpt'); if(!ws) return;
-    const out=[];
-    ws.eachRow((row,i)=>{ if(i===1) return;
-      const lib=row.getCell(1).value, tag=row.getCell(2).value;
-      if(tag) out.push('<option value="'+esc(String(tag))+'">'+esc(String(lib||''))+'</option>');
-    });
-    $('eqpt').innerHTML=out.join('');
-    $('eqptHint').textContent=out.length+" équipements disponibles, tapez pour filtrer.";
+    const r=await fetch('eqpt.json',{cache:'force-cache'});
+    if(!r.ok) throw 0;
+    const list=await r.json();
+    $('eqpt').innerHTML=list.map(([tag,lib])=>
+      '<option value="'+esc(tag)+'">'+esc(lib)+'</option>').join('');
+    $('eqptHint').textContent=list.length+' équipements du référentiel, tapez pour filtrer.';
   }catch(e){
-    $('eqptHint').textContent="Liste d'équipements indisponible, saisissez le TAG à la main.";
+    $('eqptHint').textContent='Référentiel indisponible, saisissez le TAG à la main.';
   }
 }
 
-/* insère des lignes en conservant fusions, hauteurs et styles */
-function growRows(ws, afterRow, count){
-  if(count<=0) return;
-  const merges=[...(ws.model.merges||[])];
-  merges.forEach(m=>{try{ws.unMergeCells(m)}catch(e){}});
-  ws.duplicateRow(afterRow, count, true);
-  const cut=s=>{const r=/^([A-Z]+)(\d+)$/.exec(s);return[r[1],+r[2]]};
-  const mv=r=>r>afterRow?r+count:r;
-  const next=merges.map(m=>{
-    const [a,b]=m.split(':'), [c1,r1]=cut(a), [c2,r2]=cut(b);
-    return c1+mv(r1)+':'+c2+mv(r2);
-  });
-  merges.filter(m=>+/^[A-Z]+(\d+):/.exec(m)[1]===afterRow).forEach(m=>{
-    const [a,b]=m.split(':'), c1=cut(a)[0], c2=cut(b)[0];
-    for(let i=1;i<=count;i++) next.push(c1+(afterRow+i)+':'+c2+(afterRow+i));
-  });
-  [...new Set(next)].forEach(m=>{try{ws.mergeCells(m)}catch(e){}});
+/* écrit une valeur dans une cellule existante, sans toucher à son style */
+function xesc(t){return String(t).replace(/&/g,'&amp;').replace(/</g,'&lt;')
+  .replace(/>/g,'&gt;').replace(/"/g,'&quot;')}
+function setCell(xml,ref,val,isNum){
+  if(val===null||val===undefined||val==='') return xml;
+  const re=new RegExp('<c r="'+ref+'"([^>]*?)(/>|>[\\s\\S]*?</c>)');
+  const m=re.exec(xml);
+  if(!m) return xml;                                   /* on ne crée jamais de cellule */
+  const attrs=(m[1]||'').replace(/\s*t="[^"]*"/,'');
+  const body=isNum?'<v>'+val+'</v>':'<is><t xml:space="preserve">'+xesc(val)+'</t></is>';
+  return xml.slice(0,m.index)+'<c r="'+ref+'"'+attrs+(isNum?'':' t="inlineStr"')+'>'
+    +body+'</c>'+xml.slice(m.index+m[0].length);
 }
-
-const COLS={num:'A',type:'B',tag:'C',desc:'E',flag:'L',note:'N',
-  mec_n:'R',mec_t:'S',boi_n:'T',boi_t:'U',wel_n:'V',wel_t:'W',
-  ele_n:'X',ele_t:'Y',ins_n:'Z',ins_t:'AA',oth_n:'AB',oth_t:'AC',
-  est:'AD',real:'AE'};
+const serial=d=>Math.floor((Date.UTC(d.getFullYear(),d.getMonth(),d.getDate())
+  -Date.UTC(1899,11,30))/864e5);
 const num=x=>{const n=parseFloat(x);return isNaN(n)?null:n};
 
-function putRow(ws,r,w,flag,note){
-  const put=(c,val)=>{if(val!==null&&val!==undefined&&val!=='')ws.getCell(c+r).value=val};
-  put(COLS.num,w.num); put(COLS.type,w.type); put(COLS.tag,w.tag); put(COLS.desc,w.desc);
-  put(COLS.flag,flag); put(COLS.note,note);
+function putRow(xml,r,w,flag,note){
+  xml=setCell(xml,COLS.num+r,w.num,false);
+  xml=setCell(xml,COLS.type+r,w.type,false);
+  xml=setCell(xml,COLS.tag+r,w.tag,false);
+  xml=setCell(xml,COLS.desc+r,w.desc,false);
+  xml=setCell(xml,COLS.flag+r,flag,false);
+  xml=setCell(xml,COLS.note+r,note,false);
   ['mec','boi','wel','ele','ins','oth'].forEach(k=>{
-    put(COLS[k+'_n'],num(w[k+'_n'])); put(COLS[k+'_t'],num(w[k+'_t']));
+    xml=setCell(xml,COLS[k+'_n']+r,num(w[k+'_n']),true);
+    xml=setCell(xml,COLS[k+'_t']+r,num(w[k+'_t']),true);
   });
-  put(COLS.est,num(w.est)); put(COLS.real,num(w.real));
+  xml=setCell(xml,COLS.est+r,num(w.est),true);
+  xml=setCell(xml,COLS.real+r,num(w.real),true);
+  return xml;
 }
 
 async function dlDaily(){
+  const over=[['planifiées',works.p.length,SLOT.p.max],
+              ['non planifiées',works.u.length,SLOT.u.max],
+              ['prévues demain',works.n.length,SLOT.n.max]].filter(([,c,m])=>c>m);
+  if(over.length){
+    const t=over.map(([n,c,m])=>c+' interventions '+n+' pour '+m+' emplacements').join(', ');
+    if(!confirm('Le modèle est plein : '+t+".\n\nLes suivantes ne seront pas écrites. Continuer ?")) return;
+  }
   const b=$('btnDR'), lbl=b.textContent;
   b.disabled=true; b.textContent='Préparation du fichier…';
   try{
-    const wb=new ExcelJS.Workbook();
-    await wb.xlsx.load(await getTpl());
-    const ws=wb.getWorksheet('F1');
+    const zip=fflate.unzipSync(await getTpl());
+    if(!zip[SHEET_XML]) throw new Error('feuille introuvable dans le modèle');
+    const dec=new TextDecoder(), enc=new TextEncoder();
+    let xml=dec.decode(zip[SHEET_XML]);
 
-    /* le modèle offre 1 ligne planifiée, 6 non planifiées, 1 pour demain */
-    const xP=Math.max(0,works.p.length-1),
-          xU=Math.max(0,works.u.length-6),
-          xN=Math.max(0,works.n.length-1);
-    growRows(ws,31,xN); growRows(ws,27,xU); growRows(ws,18,xP);
+    if(v('i_date'))    xml=setCell(xml,'V6',serial(new Date(v('i_date')+'T00:00:00')),true);
+    if(v('i_unit'))    xml=setCell(xml,'V7',v('i_unit'),false);
+    if(v('i_manager')) xml=setCell(xml,'G7',v('i_manager'),false);
+    xml=setCell(xml,'AI16',num(v('i_wf')),true);
+    xml=setCell(xml,'AI17',num(v('i_hrs')),true);
 
-    const rP=18, rU=22+xP, rN=31+xP+xU, shift=xP+xU+xN;
+    works.p.slice(0,SLOT.p.max).forEach((w,i)=>{xml=putRow(xml,SLOT.p.start+i*STEP,w,w.exec,w.cause)});
+    works.u.slice(0,SLOT.u.max).forEach((w,i)=>{xml=putRow(xml,SLOT.u.start+i*STEP,w,w.emg,w.com)});
+    works.n.slice(0,SLOT.n.max).forEach((w,i)=>{xml=putRow(xml,SLOT.n.start+i*STEP,w,w.plan,'')});
 
-    ws.getCell('P6').value = v('i_date') || '';
-    if(v('i_out')) ws.getCell('G7').value = v('i_out');
-
-    works.p.forEach((w,i)=>putRow(ws,rP+i,w,w.exec,w.cause));
-    works.u.forEach((w,i)=>putRow(ws,rU+i,w,w.emg,w.com));
-    works.n.forEach((w,i)=>putRow(ws,rN+i,w,w.plan,''));
-
-    /* bloc Comments : le contexte du poste, qui n'a pas de case dédiée */
     const ctx=['Poste '+(v('i_shift')||'—'),
                v('i_team')?'équipe '+v('i_team'):null,
-               'effectif '+(v('i_wf')||0)+' × '+(v('i_hrs')||0)+' h',
-               (v('i_nbstops')||0)+' arrêt(s) déclaré(s)'].filter(Boolean).join(' — ');
-    ws.getCell('A'+(34+shift)).value='1. '+ctx+'\n2. ';
-    ws.getCell('A'+(40+shift)).value=(v('i_out')||'')+(v('i_date')?' — '+v('i_date'):'');
+               (v('i_nbstops')||0)+' arrêt(s) déclaré(s)',
+               v('i_out')?'sortant '+v('i_out'):null,
+               v('i_in')?'entrant '+v('i_in'):null].filter(Boolean).join(' — ');
+    xml=setCell(xml,'A123','1. '+ctx+'\n2.',false);
+    const jj=v('i_date')?v('i_date').split('-').reverse().join('/'):'';
+    xml=setCell(xml,'A129',(v('i_out')||'')+(jj?' — '+jj:''),false);
 
-    const buf=await wb.xlsx.writeBuffer();
-    const url=URL.createObjectURL(new Blob([buf],
+    zip[SHEET_XML]=enc.encode(xml);
+    if(v('i_date') && zip['xl/calcChain.xml']){       /* V6 n'est plus une formule */
+      zip['xl/calcChain.xml']=enc.encode(
+        dec.decode(zip['xl/calcChain.xml']).replace(/<c r="V6"[^>]*\/>/,''));
+    }
+
+    const out=fflate.zipSync(zip,{level:6});
+    const url=URL.createObjectURL(new Blob([out],
       {type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}));
     const a=document.createElement('a');
     a.href=url;
-    a.download='DR_'+(v('i_date')||'sansdate').replace(/-/g,'_')+'_'+(v('i_shift')||'').slice(0,4)+'.xlsx';
+    a.download='DR_'+(v('i_date')||'sansdate').split('-').reverse().join('_')+'.xlsx';
     a.click(); setTimeout(()=>URL.revokeObjectURL(url),4000);
-    $('drHint').textContent='Rapport généré à partir du modèle JESA.';
+    $('drHint').textContent='Rapport rempli dans le modèle, mise en page inchangée.';
   }catch(e){
     alert("Le rapport n'a pas pu être généré.\n\n"+e.message
-      +"\n\nVérifiez que le fichier template.xlsx est bien déposé à côté de l'application.");
+      +"\n\nVérifiez que template.xlsx est bien déposé à côté de l'application.");
   }finally{ b.disabled=false; b.textContent=lbl; }
 }
 
