@@ -366,7 +366,7 @@ button:focus-visible{outline:3px solid var(--sulfur);outline-offset:2px}
     <p class="hint">Séparez les adresses par un point-virgule.</p></div>
   <div class="stack">
     <button class="k-off k-wide" id="btnMail" onclick="shareHandover()" disabled>Envoyer le handover par mail</button>
-    <button class="k-off k-wide" id="btnHo" onclick="dlHandover()" disabled>Télécharger le handover (.doc)</button>
+    <button class="k-off k-wide" id="btnHo" onclick="dlHandover()" disabled>Télécharger le handover (.docx)</button>
   </div>
 
   <h3>Fin de poste</h3>
@@ -739,6 +739,15 @@ async function dlDaily(){
       zip['xl/calcChain.xml']=enc.encode(
         dec.decode(zip['xl/calcChain.xml']).replace(/<c r="V6"[^>]*\/>/,''));
     }
+    /* force Excel à recalculer les taux d'occupation à l'ouverture */
+    if(zip['xl/workbook.xml']){
+      let w=dec.decode(zip['xl/workbook.xml']);
+      w = /<calcPr[^>]*>/.test(w)
+        ? w.replace(/<calcPr([^>]*?)\/?>/, (m,a)=>
+            '<calcPr'+a.replace(/\s*fullCalcOnLoad="[^"]*"/,'')+' fullCalcOnLoad="1"/>')
+        : w.replace('</workbook>','<calcPr calcId="191029" fullCalcOnLoad="1"/></workbook>');
+      zip['xl/workbook.xml']=enc.encode(w);
+    }
 
     const out=fflate.zipSync(zip,{level:6});
     const url=URL.createObjectURL(new Blob([out],
@@ -754,44 +763,128 @@ async function dlDaily(){
   }finally{ b.disabled=false; b.textContent=lbl; }
 }
 
-function hoDoc(){
-  const li=t=>(t||'').split('\n').filter(x=>x.trim())
-    .map((x,i)=>`<tr><td width="28">${i+1}</td><td>${esc(x)}</td></tr>`).join('')
-    ||'<tr><td></td><td>—</td></tr>';
-  return `<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word">
-  <head><meta charset="utf-8"><style>
-  body{font-family:Calibri,Arial;font-size:11pt;color:#141B22}
-  table{border-collapse:collapse;width:100%;margin-bottom:12px}
-  td,th{border:1px solid #8A949E;padding:6px;font-size:10pt;vertical-align:top}
-  th{background:#141B22;color:#fff;text-align:left}
-  h2{font-size:12pt;margin:16px 0 6px}
-  </style></head><body>
-  <p><b>JESA — Asset Management</b><br>Fiche de passation de poste</p>
-  <table>
-  <tr><th colspan="4">Chantier</th></tr>
-  <tr><td><b>Projet</b></td><td>Solid Sulfur Port Superstructure</td><td><b>Client</b></td><td>OCP — B10</td></tr>
-  <tr><td><b>Zone</b></td><td>${esc(v('i_unit')||'—')}</td><td><b>Date</b></td><td>${esc(v('i_date')||'—')}</td></tr>
-  <tr><td><b>Poste</b></td><td>${esc(v('i_shift')||'—')}</td><td><b>Équipe</b></td><td>${esc(v('i_team')||'—')}</td></tr>
-  </table>
-  <table>
-  <tr><td><b>Superviseur sortant</b></td><td>${esc(v('i_out')||'—')}</td><td><b>Fonction</b></td><td>${esc(v('i_outfn')||'—')}</td></tr>
-  <tr><td><b>Superviseur entrant</b></td><td colspan="3">${esc(v('i_in')||'—')}</td></tr>
-  </table>
-  <h2>Ce qui a été fait</h2><table>${li(v('h_done'))}</table>
-  <h2>Ce qui reste à faire</h2><table>${li(v('h_todo'))}</table>
-  <table><tr><th width="50%">Signature — poste terminé</th><th>Signature — poste pris</th></tr>
-  <tr><td align="center" height="95">${SIG.out?`<img src="${SIG.out}" width="215">`:'&nbsp;'}<br>${esc(v('i_out')||'')}</td>
-      <td align="center" height="95">${SIG.in?`<img src="${SIG.in}" width="215">`:'&nbsp;'}<br>${esc(v('i_in')||'')}</td></tr></table>
-  </body></html>`;
+const TPL_HO='Modele_Handover.docx';
+let hoBuf=null;
+
+async function getHoTpl(){
+  if(hoBuf) return hoBuf;
+  const r=await fetch(TPL_HO,{cache:'no-store'});
+  if(!r.ok) throw new Error('modèle Word introuvable ('+r.status+')');
+  hoBuf=new Uint8Array(await r.arrayBuffer());
+  return hoBuf;
 }
-function dlHandover(){
+
+/* horaires déduits du poste choisi */
+const POSTES={'1er (06h-14h)':['06h00','14h00',0,0],
+              '2ème (14h-22h)':['14h00','22h00',0,0],
+              '3ème (22h-06h)':['22h00','06h00',0,1]};
+const SUIVANT={'1er (06h-14h)':'2ème (14h-22h)',
+               '2ème (14h-22h)':'3ème (22h-06h)',
+               '3ème (22h-06h)':'1er (06h-14h)'};
+function jourPlus(iso,n){
+  if(!iso) return '';
+  const d=new Date(iso+'T00:00:00'); d.setDate(d.getDate()+n);
+  return d.toISOString().slice(0,10).split('-').reverse().join(' ');
+}
+function creneau(poste,iso){
+  const p=POSTES[poste]; if(!p||!iso) return ['',''];
+  return [jourPlus(iso,p[2])+' / '+p[0], jourPlus(iso,p[3])+' / '+p[1]];
+}
+
+/* dataURL -> octets, et lecture des dimensions du PNG */
+function pngBytes(dataUrl){
+  const b=atob(dataUrl.split(',')[1]);
+  const u=new Uint8Array(b.length);
+  for(let i=0;i<b.length;i++) u[i]=b.charCodeAt(i);
+  return u;
+}
+function pngSize(u){
+  const dv=new DataView(u.buffer,u.byteOffset,u.byteLength);
+  return {w:dv.getUint32(16), h:dv.getUint32(20)};
+}
+
+function wesc(t){return String(t).replace(/&/g,'&amp;').replace(/</g,'&lt;')
+  .replace(/>/g,'&gt;').replace(/"/g,'&quot;')}
+/* plusieurs lignes -> sauts de ligne Word */
+function wlignes(t){
+  const l=(t||'').split('\n').map(x=>x.trim()).filter(Boolean);
+  if(!l.length) return '';
+  return l.map(wesc).join('</w:t><w:br/><w:t xml:space="preserve">');
+}
+
+/* redimensionne l'emplacement d'une signature en gardant ses proportions */
+function cadrer(xml, embed, png){
+  const i=xml.indexOf('r:embed="'+embed+'"');
+  if(i<0) return xml;
+  const HAUTEUR=335280;                         /* hauteur du cadre, en EMU */
+  const {w,h}=pngSize(png);
+  const largeur=Math.round(HAUTEUR*(w/h));
+  /* cadre de l'image ancree, situe avant la reference */
+  const a=xml.lastIndexOf('<wp:extent',i), b=xml.indexOf('/>',a)+2;
+  if(a>0) xml=xml.slice(0,a)+'<wp:extent cx="'+largeur+'" cy="'+HAUTEUR+'"/>'+xml.slice(b);
+  /* taille du dessin, apres la reference : uniquement <a:ext cx=... cy=.../> */
+  const j=xml.indexOf('r:embed="'+embed+'"');
+  const re=/<a:ext\s+cx="\d+"\s+cy="\d+"\s*\/>/g;
+  re.lastIndex=j;
+  const m=re.exec(xml);
+  if(m) xml=xml.slice(0,m.index)+'<a:ext cx="'+largeur+'" cy="'+HAUTEUR+'"/>'+xml.slice(m.index+m[0].length);
+  return xml;
+}
+
+async function dlHandover(){
   if(!(SIG.out&&SIG.in)){alert('Il manque une signature.');return}
-  if(!mailSent){alert('Envoyez d\'abord le handover par mail.');return}
-  const b=new Blob(['\ufeff'+hoDoc()],{type:'application/msword'});
-  const a=document.createElement('a');
-  a.href=URL.createObjectURL(b);
-  a.download=`HANDOVER_${(v('i_date')||'sansdate').replace(/-/g,'_')}.doc`; a.click();
+  if(!mailSent){alert("Envoyez d'abord le handover par mail.");return}
+  const b=$('btnHo'), lbl=b.textContent;
+  b.disabled=true; b.textContent='Préparation du document…';
+  try{
+    const zip=fflate.unzipSync(await getHoTpl());
+    const dec=new TextDecoder(), enc=new TextEncoder();
+    let xml=dec.decode(zip['word/document.xml']);
+
+    const iso=v('i_date'), poste=v('i_shift');
+    const [d1,f1]=creneau(poste,iso);
+    const [d2,f2]=creneau(SUIVANT[poste]||'', poste==='3ème (22h-06h)'?jourIso(iso,1):iso);
+
+    const champs={
+      DATE: iso?iso.split('-').reverse().join(' '):'',
+      DEBUT_SORTANT:d1, FIN_SORTANT:f1,
+      DEBUT_ENTRANT:d2, FIN_ENTRANT:f2,
+      EQUIPE_SORTANT:v('i_team'), EQUIPE_ENTRANT:'',
+      FONCTION_SORTANT:v('i_outfn'), FONCTION_ENTRANT:'',
+      SORTANT:v('i_out'), ENTRANT:v('i_in'),
+      HEURE_PASSATION:f1.split(' / ')[1]||''
+    };
+    Object.keys(champs).forEach(k=>{
+      xml=xml.split('{{'+k+'}}').join(wesc(champs[k]));
+    });
+    xml=xml.split('{{ACTIONS_A_FAIRE}}').join(wlignes(v('h_todo')));
+    xml=xml.split('{{ACTIONS_FAITES}}').join(wlignes(v('h_done')));
+
+    const s1=pngBytes(SIG.out), s2=pngBytes(SIG.in);
+    zip['word/media/image2.png']=s1;
+    zip['word/media/image3.png']=s2;
+    xml=cadrer(xml,'rId12',s1);
+    xml=cadrer(xml,'rId900',s2);
+
+    zip['word/document.xml']=enc.encode(xml);
+    const out=fflate.zipSync(zip,{level:6});
+    const url=URL.createObjectURL(new Blob([out],
+      {type:'application/vnd.openxmlformats-officedocument.wordprocessingml.document'}));
+    const a=document.createElement('a');
+    a.href=url;
+    a.download='HANDOVER_'+(iso||'sansdate').split('-').reverse().join('_')+'.docx';
+    a.click(); setTimeout(()=>URL.revokeObjectURL(url),4000);
+  }catch(e){
+    alert("Le handover n'a pas pu être généré.\n\n"+e.message
+      +"\n\nVérifiez que Modele_Handover.docx est déposé à côté de l'application.");
+  }finally{ b.disabled=false; b.textContent=lbl; }
 }
+function jourIso(iso,n){
+  if(!iso) return iso;
+  const d=new Date(iso+'T00:00:00'); d.setDate(d.getDate()+n);
+  return d.toISOString().slice(0,10);
+}
+
 function shareHandover(){
   if(!(SIG.out&&SIG.in)){alert('Il manque une signature.');return}
   const to=(v('i_mailto')||v('i_inmail')||'').replace(/\s*;\s*/g,',');
